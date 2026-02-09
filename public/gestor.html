@@ -19,14 +19,22 @@
             background-color: var(--bg-deep); 
             color: var(--text); 
             font-family: 'Segoe UI', sans-serif; 
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        /* Wrapper principal que será borrado */
+        #app-content {
             display: flex; 
             flex-direction: column; 
-            min-height: 100vh; 
+            min-height: 100vh;
+            filter: blur(15px); /* Começa borrado */
+            pointer-events: none; /* Bloqueia cliques */
+            transition: filter 0.5s ease;
         }
         
         .header { padding: 15px 30px; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
         
-        /* --- CARDS INTERATIVOS --- */
         .card-stat {
             background: var(--bg-card);
             border-radius: 12px;
@@ -94,69 +102,171 @@
             opacity: 0.3;
             border-top: 1px solid rgba(255,255,255,0.05);
         }
+
+        /* Input Group para Senha */
+        .input-group-text { background: var(--accent); border: none; color: white; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="modal fade" id="modalLogin" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background: var(--bg-card); border: 1px solid var(--accent);">
+        <div class="modal-content" style="background: var(--bg-deep); border: 1px solid var(--highlight);">
             <div class="modal-header border-0 justify-content-center">
-                <h3 style="color: white;">🔒 Acesso Restrito</h3>
+                <h3 style="color: white;">🔒 Acesso Gestor</h3>
             </div>
             <div class="modal-body text-center">
-                <p class="text-light">Área exclusiva da Gestão.</p>
-                <input type="password" id="senhaInput" class="form-control text-center" placeholder="Digite a senha..." style="font-size: 1.5rem;">
-                <p id="erroSenha" class="text-danger mt-2" style="display: none;">Senha incorreta!</p>
-            </div>
-            <div class="modal-footer border-0 justify-content-center">
-                <button class="btn btn-primary w-100" onclick="verificarSenha()">ENTRAR</button>
+                <p class="text-light opacity-75">Área Restrita da Coordenação</p>
+                
+                <div class="input-group mb-3">
+                    <input type="password" id="senhaInput" class="form-control text-center" placeholder="Senha..." style="font-size: 1.2rem; background: rgba(0,0,0,0.3); color: white; border: 1px solid var(--accent);">
+                    <span class="input-group-text" onclick="toggleSenha()">👁️</span>
+                </div>
+
+                <p id="erroSenha" class="text-danger fw-bold" style="display: none;">Senha incorreta!</p>
+                <button class="btn btn-primary w-100 py-2" onclick="verificarSenha()" style="background: var(--highlight); color: #000; font-weight: bold; border: none;">ACESSAR PAINEL</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="app-content" style="filter: blur(10px); pointer-events: none;">
-    
+<div id="app-content">
+
+    <div class="header">
+        <div>
+            <h2 class="m-0" style="color: white; font-weight: bold;">📊 NTI MANAGEMENT</h2>
+            <span style="color: var(--highlight); font-weight: 500;">Indicadores de Performance Diária</span>
+        </div>
+        <div class="clock-container">
+            <div id="relogio-hora" class="clock-time">00:00:00</div>
+            <div id="relogio-data" class="clock-date">Carregando data...</div>
+        </div>
     </div>
+
+    <div class="container-fluid px-5 mt-4">
+        <div class="row g-4">
+            <div class="col-md-3"><div class="card-stat" onclick="abrirDetalhes('total', 'Demanda Total')"><div class="big-number" id="kpi-total">0</div><div class="label-stat">Demanda Total</div><span class="desc-stat">Chamados de hoje</span></div></div>
+            <div class="col-md-3"><div class="card-stat" style="border-bottom: 4px solid #00cec9;" onclick="abrirDetalhes('humanos', 'Resolvidos pela Equipe')"><div class="big-number" style="color: #00cec9;" id="kpi-humanos">0</div><div class="label-stat">Resolvidos (N1/N2)</div><span class="desc-stat">Solucionados pela equipe</span></div></div>
+            <div class="col-md-3"><div class="card-stat" style="border-bottom: 4px solid #fdcb6e;" onclick="abrirDetalhes('robo', 'Autoatendimento Chatbot')"><div class="big-number" style="color: #fdcb6e;" id="kpi-robo">0</div><div class="label-stat">Autoatendimento</div><span class="desc-stat">Solucionados via chatbot</span></div></div>
+            <div class="col-md-3"><div class="card-stat" style="border-bottom: 4px solid #ff6b6b;" onclick="abrirDetalhes('n3', 'Escalados N3 (Infra)')"><div class="big-number" style="color: #ff6b6b;" id="kpi-n3">0</div><div class="label-stat">Escalados N3</div><span class="desc-stat">ATI/Contratos/Terceirizados</span></div></div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-8 offset-md-2">
+                <div class="chart-container">
+                    <h5 class="text-center mb-4 text-white">Categorias de Incidentes</h5>
+                    <canvas id="myChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDetalhes" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="modalTitulo">Detalhes</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body"><div class="table-responsive"><table class="table table-dark table-hover table-sm"><thead><tr><th>Horário</th><th>Solicitante</th><th>Setor</th><th>Problema relatado pelo usuário</th><th>Status</th><th>Solução Aplicada pelo NTI</th></tr></thead><tbody id="tabelaDetalhes"></tbody></table></div></div>
+                <div class="modal-footer"><small class="text-muted me-auto">* Exibindo registros apenas do dia atual.</small><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>Desenvolvido por João Douglas Brito de Sá <strong>Félix</strong> 2026</footer>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // --- LÓGICA DE SEGURANÇA ---
+    let dadosCache = {};
+
+    // --- LOGIN ---
     const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
-    
-    // Verifica se já logou hoje
+    const inputSenha = document.getElementById('senhaInput');
+
     if(!sessionStorage.getItem('gestor_logado')) {
         modalLogin.show();
     } else {
         desbloquearTela();
     }
 
+    function toggleSenha() {
+        inputSenha.type = inputSenha.type === 'password' ? 'text' : 'password';
+    }
+
     function verificarSenha() {
-        const s = document.getElementById('senhaInput').value;
-        // SENHA DEFINIDA AQUI:
-        if(s === "nti2026") { 
+        if(inputSenha.value === "nti2026") { 
             sessionStorage.setItem('gestor_logado', 'true');
             modalLogin.hide();
             desbloquearTela();
         } else {
             document.getElementById('erroSenha').style.display = 'block';
-            document.getElementById('senhaInput').value = '';
+            inputSenha.value = '';
         }
     }
+    
+    // Enter para logar
+    inputSenha.addEventListener('keypress', (e) => { if(e.key==='Enter') verificarSenha(); });
 
     function desbloquearTela() {
         const app = document.getElementById('app-content');
         app.style.filter = 'none';
         app.style.pointerEvents = 'all';
-        // Inicia a atualização dos dados só depois de logar
+        // Inicia atualização dos dados
         updateDashboard();
         setInterval(updateDashboard, 5000);
     }
 
-    // --- (ABAIXO, MANTENHA O RESTO DO SCRIPT DE GRÁFICOS QUE JÁ TINHAMOS) ---
-    // ... mas REMOVA a chamada updateDashboard() do final do script antigo
-    // ... pois agora ela é chamada dentro de desbloquearTela()
+    // --- SISTEMA ---
+    function atualizarRelogio() {
+        const agora = new Date();
+        document.getElementById('relogio-hora').innerText = agora.toLocaleTimeString('pt-BR', { hour12: false });
+        const d = agora.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('relogio-data').innerText = d.charAt(0).toUpperCase() + d.slice(1);
+    }
+    setInterval(atualizarRelogio, 1000); atualizarRelogio();
+
+    let myChart = null;
+    function renderChart(labels, data) {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        if(myChart) { myChart.data.labels = labels; myChart.data.datasets[0].data = data; myChart.update(); return; }
+        myChart = new Chart(ctx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: data, backgroundColor: ['#1B98E0', '#00cec9', '#fdcb6e', '#ff6b6b', '#a29bfe'], borderColor: '#1f3a52', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#E8F1F2' } } } } });
+    }
+
+    async function updateDashboard() {
+        try {
+            const res = await fetch('/api/stats/hoje');
+            const data = await res.json();
+            dadosCache = data.detalhes; 
+            document.getElementById('kpi-total').innerText = data.total;
+            document.getElementById('kpi-humanos').innerText = data.resolvidos_humanos;
+            document.getElementById('kpi-robo').innerText = data.resolvidos_robo;
+            document.getElementById('kpi-n3').innerText = data.escalados_n3;
+            const labels = Object.keys(data.grafico);
+            const valores = Object.values(data.grafico);
+            if(labels.length === 0) renderChart(['Aguardando'], [1]); else renderChart(labels, valores);
+        } catch (e) { console.error("Erro stats", e); }
+    }
+
+    function abrirDetalhes(tipo, titulo) {
+        const lista = dadosCache ? dadosCache[tipo] : [];
+        const tbody = document.getElementById('tabelaDetalhes');
+        document.getElementById('modalTitulo').innerText = `📋 Detalhes: ${titulo}`;
+        tbody.innerHTML = '';
+        if(!lista || lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Nenhum registro encontrado.</td></tr>';
+        } else {
+            lista.forEach(t => {
+                let badge = 'bg-secondary';
+                if(t.status==='solucionado') badge='bg-info text-dark';
+                if(t.status==='auto_solucionado') badge='bg-warning text-dark';
+                if(t.status==='n3') badge='bg-danger';
+                if(t.status==='aberto') badge='bg-success';
+                const hora = new Date(t.timestamp).toLocaleTimeString('pt-BR');
+                const row = `<tr><td><code>${hora}</code></td><td>${t.solicitante}</td><td>${t.setor}</td><td>${t.problema}</td><td><span class="badge ${badge}">${t.status}</span></td><td><small>${t.solucao || '-'}</small></td></tr>`;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+        new bootstrap.Modal(document.getElementById('modalDetalhes')).show();
+    }
 </script>
 </body>
 </html>
