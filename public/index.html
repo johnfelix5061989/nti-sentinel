@@ -13,7 +13,16 @@
             --accent-bright: #1B98E0;
             --text-light: #E8F1F2;
         }
-        body { background-color: var(--bg-deep); color: var(--text-light); font-family: 'Segoe UI', sans-serif; }
+        
+        /* Ajuste no BODY para o rodapé ficar fixo embaixo */
+        body { 
+            background-color: var(--bg-deep); 
+            color: var(--text-light); 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
         
         .chat-container { 
             max-width: 500px; 
@@ -40,6 +49,17 @@
         .hidden { display: none; }
         .fade-in { animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Estilo do Rodapé */
+        footer {
+            margin-top: auto; /* Empurra para o fundo */
+            text-align: center;
+            padding: 20px;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            opacity: 0.6;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
     </style>
 </head>
 <body>
@@ -67,10 +87,19 @@
 
         <div id="form-chamado" class="hidden mt-3 fade-in">
             <h6 class="text-info mb-3">Abrir Chamado Técnico</h6>
-            <input type="text" id="nome" class="form-control mb-2" placeholder="Seu Nome Completo">
+            
+            <div class="row mb-2">
+                <div class="col-8">
+                    <input type="text" id="nome" class="form-control" placeholder="Nome Completo">
+                </div>
+                <div class="col-4">
+                    <input type="number" id="matricula" class="form-control" placeholder="Matrícula">
+                </div>
+            </div>
+
             <input type="text" id="setor" class="form-control mb-2" placeholder="Seu Setor">
             <input type="hidden" id="assunto-pre" value="">
-            <textarea id="desc" class="form-control mb-2" rows="2" placeholder="Descreva detalhes (ex: número da sala/patrimônio)..."></textarea>
+            <textarea id="desc" class="form-control mb-2" rows="2" placeholder="Descreva detalhes..."></textarea>
             
             <div class="d-flex gap-2">
                 <button class="btn btn-secondary w-50" onclick="cancelar()">Voltar</button>
@@ -79,6 +108,10 @@
         </div>
     </div>
 </div>
+
+<footer>
+    Desenvolvido por João Douglas Brito de Sá <strong>Félix</strong> 2026
+</footer>
 
 <script>
 const box = document.getElementById('chat-box');
@@ -94,8 +127,6 @@ function addBot(msg){
     box.scrollTop = box.scrollHeight;
 }
 
-// Prepara o formulário caso não resolva
-// Substitua a função finalizar() antiga por esta:
 function finalizar(assunto){
     opcoes.innerHTML = `
         <div class="row g-2">
@@ -109,13 +140,10 @@ function finalizar(assunto){
     `;
 }
 
-// Adicione esta nova função para salvar o sucesso do Chatbot:
 async function registrarAutoResolucao(assunto) {
-    // Feedback visual imediato
     opcoes.innerHTML = `<div class="alert alert-success text-center">🎉 Que bom! O NTI agradece.</div>`;
     addBot("Fico feliz em ter ajudado! O caso foi registrado como solucionado.");
     
-    // Envia para o servidor silenciosamente
     try {
         await fetch('/api/ticket/auto', {
             method: 'POST',
@@ -127,7 +155,6 @@ async function registrarAutoResolucao(assunto) {
         });
     } catch (e) { console.error("Erro ao salvar log", e); }
 
-    // Reinicia após 4 segundos
     setTimeout(() => location.reload(), 4000);
 }
 
@@ -135,7 +162,6 @@ function mostrarFormulario(assunto) {
     opcoes.classList.add('hidden');
     form.classList.remove('hidden');
     document.getElementById('assunto-pre').value = assunto;
-    // Adiciona mensagem automática no chat
     addBot(`Entendido. Por favor, preencha seus dados para que eu chame um técnico para verificar o problema de: <strong>${assunto}</strong>.`);
 }
 
@@ -207,23 +233,24 @@ function conversa(tipo){
     }, 400);
 }
 
-// --- INTEGRAÇÃO COM BACKEND ---
+// FUNÇÃO UNIFICADA E CORRIGIDA
 async function enviarChamado() {
     const nome = document.getElementById('nome').value;
+    const matricula = document.getElementById('matricula').value; // Pega o valor
     const setor = document.getElementById('setor').value;
     const assunto = document.getElementById('assunto-pre').value;
     const descExtra = document.getElementById('desc').value;
 
-    if(!nome || !setor) return alert('Por favor, preencha Nome e Setor!');
+    // Validação Obrigatória
+    if(!nome || !setor || !matricula) return alert('Por favor, preencha Nome, Matrícula e Setor!');
 
-    // Combina o assunto automático com a descrição do usuário
     const problemaFinal = `[${assunto}] ${descExtra}`;
 
     try {
         const res = await fetch('/api/ticket', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ solicitante: nome, setor: setor, problema: problemaFinal })
+            body: JSON.stringify({ solicitante: nome, matricula: matricula, setor: setor, problema: problemaFinal })
         });
 
         if(res.ok) {
@@ -235,7 +262,7 @@ async function enviarChamado() {
                 </div>
             `;
             box.scrollTop = box.scrollHeight;
-            setTimeout(() => location.reload(), 5000); // Reinicia após 5s
+            setTimeout(() => location.reload(), 5000);
         } else {
             alert('Erro ao comunicar com o servidor.');
         }

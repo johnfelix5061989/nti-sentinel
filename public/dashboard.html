@@ -13,11 +13,15 @@
             --text-light: #E8F1F2;   /* Azure */
         }
 
+        /* Ajuste no Body para o rodapé ficar no chão */
         body { 
             background-color: var(--bg-deep); 
             color: var(--text-light); 
             font-family: 'Segoe UI', sans-serif; 
-            overflow-x: hidden; 
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; 
         }
         
         /* Cabeçalho */
@@ -52,7 +56,7 @@
         
         .ticket-meta { 
             font-size: 0.9rem; 
-            color: #b0c4de; /* Um azul pálido para subtítulos */
+            color: #b0c4de;
             background: rgba(0,0,0,0.2);
             padding: 5px;
             border-radius: 5px;
@@ -65,7 +69,7 @@
             border: 1px solid var(--accent-1);
         }
         
-        /* Animação de Novo Chamado (Mantive o vermelho para urgência, mas suave) */
+        /* Animação */
         .new-ticket { 
             animation: flashAlert 1.5s infinite alternate; 
             border-left-color: #ff6b6b; 
@@ -75,7 +79,7 @@
             to { box-shadow: 0 0 20px var(--accent-bright); border-left-color: #ff4757; } 
         }
 
-        /* Modal Escuro - Ajustado para a paleta */
+        /* Modal Escuro */
         .modal-content { 
             background: var(--bg-deep); 
             color: var(--text-light); 
@@ -98,30 +102,65 @@
         .btn-escalate { background: transparent; border: 2px solid #ff6b6b; color: #ff6b6b; font-weight: bold; }
         .btn-escalate:hover { background: #ff6b6b; color: var(--bg-deep); }
 
+        /* RODAPÉ */
+        footer {
+            margin-top: auto;
+            text-align: center;
+            padding: 15px;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            opacity: 0.4;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div>
-        <h1>📡 NTI SENTINEL</h1>
-        <small>MONITORAMENTO EM TEMPO REAL</small>
-    </div>
-    <div class="text-end">
-        <h2 id="relogio" style="font-family: monospace; color: var(--accent-bright);">00:00:00</h2>
-        <small style="opacity: 0.8">Reset Automático: 07:00 AM</small>
+<div class="modal fade" id="modalLogin" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: var(--bg-deep); border: 1px solid var(--accent-bright);">
+            <div class="modal-header border-0 justify-content-center">
+                <h3 style="color: white;">🛡️ NTI Sentinel</h3>
+            </div>
+            <div class="modal-body text-center">
+                <p class="text-light opacity-75">Acesso Restrito ao Operador</p>
+                <input type="password" id="senhaInput" class="form-control text-center mb-3" placeholder="Senha..." style="font-size: 1.5rem;">
+                <p id="erroSenha" class="text-danger fw-bold" style="display: none;">Senha incorreta!</p>
+                <button class="btn btn-primary w-100 py-2" onclick="verificarSenha()" style="background: var(--accent-bright); font-weight: bold;">ACESSAR SISTEMA</button>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="container-fluid mt-4">
-    <div class="row" id="lista-chamados">
+<div id="app-content" style="filter: blur(10px); pointer-events: none; display: flex; flex-direction: column; min-height: 100vh;">
+
+    <div class="header">
+        <div>
+            <h1>📡 NTI SENTINEL</h1>
+            <small>MONITORAMENTO EM TEMPO REAL</small>
         </div>
-    
-    <div id="empty-state" class="text-center mt-5" style="display: none; color: var(--accent-1);">
-        <h1 style="font-size: 5rem; opacity: 0.3;">🛡️</h1>
-        <h3>Sistema Operante</h3>
-        <p>Nenhum incidente na fila de atendimento.</p>
+        <div class="text-end">
+            <h2 id="relogio" style="font-family: monospace; color: var(--accent-bright);">00:00:00</h2>
+            <small style="opacity: 0.8">Reset Automático: 07:00 AM</small>
+        </div>
     </div>
+
+    <div class="container-fluid mt-4">
+        <div class="row" id="lista-chamados">
+            </div>
+        
+        <div id="empty-state" class="text-center mt-5" style="display: none; color: var(--accent-1);">
+            <h1 style="font-size: 5rem; opacity: 0.3;">🛡️</h1>
+            <h3>Sistema Operante</h3>
+            <p>Nenhum incidente na fila de atendimento.</p>
+        </div>
+    </div>
+
+    <footer>
+        João Douglas Brito de Sá <strong>Félix</strong> 2026
+    </footer>
+
 </div>
 
 <div class="modal fade" id="modalResolucao" tabindex="-1">
@@ -154,48 +193,91 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // --- LÓGICA DE LOGIN ---
+    const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
+
+    // Verifica se já logou nesta sessão
+    if(!sessionStorage.getItem('operador_logado')) {
+        modalLogin.show();
+    } else {
+        desbloquearTela();
+    }
+
+    function verificarSenha() {
+        const s = document.getElementById('senhaInput').value;
+        if(s === "nti2026") { 
+            sessionStorage.setItem('operador_logado', 'true');
+            modalLogin.hide();
+            desbloquearTela();
+        } else {
+            document.getElementById('erroSenha').style.display = 'block';
+            document.getElementById('senhaInput').value = '';
+        }
+    }
+
+    // Permite login com Enter
+    document.getElementById('senhaInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') verificarSenha();
+    });
+
+    function desbloquearTela() {
+        const app = document.getElementById('app-content');
+        app.style.filter = 'none';
+        app.style.pointerEvents = 'all';
+        iniciarSistema(); // Só conecta o socket e busca dados depois de logar
+    }
+
+    // --- SISTEMA DASHBOARD ---
     const socket = io();
     const lista = document.getElementById('lista-chamados');
     const emptyState = document.getElementById('empty-state');
     let modalInstance;
 
-    setInterval(() => {
-        document.getElementById('relogio').innerText = new Date().toLocaleTimeString('pt-BR');
-    }, 1000);
+    function iniciarSistema() {
+        // Relógio
+        setInterval(() => {
+            document.getElementById('relogio').innerText = new Date().toLocaleTimeString('pt-BR');
+        }, 1000);
 
-    fetch('/api/tickets/ativos')
-        .then(r => r.json())
-        .then(tickets => {
-            if(tickets.length === 0) emptyState.style.display = 'block';
-            tickets.forEach(adicionarCard);
+        // Busca inicial
+        fetch('/api/tickets/ativos')
+            .then(r => r.json())
+            .then(tickets => {
+                if(tickets.length === 0) emptyState.style.display = 'block';
+                tickets.forEach(adicionarCard);
+            });
+
+        // Socket Events
+        socket.on('novo_chamado', (ticket) => {
+            emptyState.style.display = 'none';
+            adicionarCard(ticket);
+            const audio = new Audio('https://freesound.org/data/previews/250/250629_4486188-lq.mp3'); 
+            audio.volume = 0.4;
+            audio.play().catch(() => {});
         });
 
-    socket.on('novo_chamado', (ticket) => {
-        emptyState.style.display = 'none';
-        adicionarCard(ticket);
-        const audio = new Audio('https://freesound.org/data/previews/250/250629_4486188-lq.mp3'); 
-        audio.volume = 0.4;
-        audio.play().catch(() => {});
-    });
+        socket.on('atualiza_chamado', (data) => {
+            const card = document.getElementById(`card-${data.id}`);
+            if(card) {
+                card.style.transform = "scale(0.8)";
+                card.style.opacity = "0";
+                setTimeout(() => { 
+                    card.remove(); 
+                    if(lista.children.length === 0) emptyState.style.display = 'block';
+                }, 300);
+            }
+        });
 
-    socket.on('atualiza_chamado', (data) => {
-        const card = document.getElementById(`card-${data.id}`);
-        if(card) {
-            card.style.transform = "scale(0.8)";
-            card.style.opacity = "0";
-            setTimeout(() => { 
-                card.remove(); 
-                if(lista.children.length === 0) emptyState.style.display = 'block';
-            }, 300);
-        }
-    });
-
-    socket.on('reset_diario', () => {
-        lista.innerHTML = '';
-        emptyState.style.display = 'block';
-    });
+        socket.on('reset_diario', () => {
+            lista.innerHTML = '';
+            emptyState.style.display = 'block';
+        });
+    }
 
     function adicionarCard(t) {
+        // Formata Matrícula
+        const matTexto = t.matricula ? `(Mat: ${t.matricula})` : '';
+        
         const html = `
             <div class="col-md-4 col-lg-3 fade-in" id="card-${t.id}">
                 <div class="card card-ticket p-3 new-ticket" onclick="abrirModal(${t.id})">
@@ -207,6 +289,7 @@
                     <hr style="border-color: var(--accent-1); opacity: 0.3;">
                     <div class="ticket-meta">
                         👤 ${t.solicitante} <br> 
+                        <small class="text-info">${matTexto}</small> <br>
                         🕒 ${new Date(t.timestamp).toLocaleTimeString('pt-BR')}
                     </div>
                 </div>

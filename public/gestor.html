@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel de Gestão NTI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-deep: #13293D;
+            --bg-card: #1f3a52;
+            --accent: #1B98E0;
+            --text: #E8F1F2;
+            --highlight: #00d2d3;
+            --danger: #ff6b6b;
+        }
+
+        body { 
+            background-color: var(--bg-deep); 
+            color: var(--text); 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
+        
+        .header { padding: 15px 30px; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        
+        /* --- CARDS INTERATIVOS --- */
+        .card-stat {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            height: 100%;
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .card-stat:hover { 
+            transform: translateY(-5px); 
+            border-color: var(--highlight); 
+            background: #254663;
+        }
+        .card-stat::after {
+            content: "🔍 Ver Detalhes";
+            position: absolute;
+            bottom: 5px;
+            left: 0;
+            right: 0;
+            font-size: 0.75rem;
+            color: var(--highlight);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .card-stat:hover::after { opacity: 1; }
+        
+        .big-number { font-size: 3.5rem; font-weight: bold; color: white; line-height: 1; text-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .label-stat { font-size: 1rem; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+        .desc-stat { font-size: 0.85rem; color: var(--highlight); opacity: 0.8; margin-top: 5px; }
+
+        .chart-container {
+            background: var(--bg-card);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .clock-container { text-align: right; }
+        .clock-time { font-size: 1.8rem; font-weight: bold; color: var(--highlight); font-family: monospace; line-height: 1; }
+        .clock-date { font-size: 0.9rem; color: var(--text); opacity: 0.7; }
+
+        /* Modal e Tabela */
+        .modal-content { background: var(--bg-deep); color: var(--text); border: 1px solid var(--accent); }
+        .modal-header { border-bottom: 1px solid var(--bg-card); }
+        .btn-close-white { filter: invert(1); }
+        .table { color: var(--text); }
+        .table-hover tbody tr:hover { color: var(--highlight); background-color: rgba(255,255,255,0.05); }
+
+        footer {
+            margin-top: auto;
+            text-align: center;
+            padding: 15px;
+            font-size: 0.8rem;
+            color: var(--text);
+            opacity: 0.3;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+    </style>
+</head>
+<body>
+
+<div class="modal fade" id="modalLogin" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: var(--bg-card); border: 1px solid var(--accent);">
+            <div class="modal-header border-0 justify-content-center">
+                <h3 style="color: white;">🔒 Acesso Restrito</h3>
+            </div>
+            <div class="modal-body text-center">
+                <p class="text-light">Área exclusiva da Gestão.</p>
+                <input type="password" id="senhaInput" class="form-control text-center" placeholder="Digite a senha..." style="font-size: 1.5rem;">
+                <p id="erroSenha" class="text-danger mt-2" style="display: none;">Senha incorreta!</p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button class="btn btn-primary w-100" onclick="verificarSenha()">ENTRAR</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="app-content" style="filter: blur(10px); pointer-events: none;">
+    
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- LÓGICA DE SEGURANÇA ---
+    const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
+    
+    // Verifica se já logou hoje
+    if(!sessionStorage.getItem('gestor_logado')) {
+        modalLogin.show();
+    } else {
+        desbloquearTela();
+    }
+
+    function verificarSenha() {
+        const s = document.getElementById('senhaInput').value;
+        // SENHA DEFINIDA AQUI:
+        if(s === "nti2026") { 
+            sessionStorage.setItem('gestor_logado', 'true');
+            modalLogin.hide();
+            desbloquearTela();
+        } else {
+            document.getElementById('erroSenha').style.display = 'block';
+            document.getElementById('senhaInput').value = '';
+        }
+    }
+
+    function desbloquearTela() {
+        const app = document.getElementById('app-content');
+        app.style.filter = 'none';
+        app.style.pointerEvents = 'all';
+        // Inicia a atualização dos dados só depois de logar
+        updateDashboard();
+        setInterval(updateDashboard, 5000);
+    }
+
+    // --- (ABAIXO, MANTENHA O RESTO DO SCRIPT DE GRÁFICOS QUE JÁ TINHAMOS) ---
+    // ... mas REMOVA a chamada updateDashboard() do final do script antigo
+    // ... pois agora ela é chamada dentro de desbloquearTela()
+</script>
+</body>
+</html>

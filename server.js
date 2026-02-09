@@ -21,14 +21,38 @@ const sequelize = new Sequelize({
     logging: false
 });
 
+// ... (início do arquivo igual)
+
+// 1. Atualize a Tabela no Banco
 const Ticket = sequelize.define('Ticket', {
     solicitante: Sequelize.STRING,
+    matricula: Sequelize.STRING, // <--- NOVO CAMPO
     setor: Sequelize.STRING,
     problema: Sequelize.STRING,
     status: { type: Sequelize.STRING, defaultValue: 'aberto' },
     solucao: Sequelize.TEXT,
     timestamp: { type: Sequelize.DATE, defaultValue: Sequelize.NOW }
 });
+
+// ... (código do meio igual)
+
+// 2. Atualize a API que recebe o chamado
+app.post('/api/ticket', async (req, res) => {
+    try {
+        const { solicitante, matricula, setor, problema } = req.body; // <--- Recebe matricula
+        console.log(`📝 Novo chamado: ${solicitante} (${matricula})`);
+        
+        const novoTicket = await Ticket.create({ solicitante, matricula, setor, problema });
+        
+        io.emit('novo_chamado', novoTicket);
+        res.json({ success: true, ticket: novoTicket });
+    } catch (error) {
+        console.error("Erro:", error);
+        res.status(500).json({ error: 'Erro ao abrir chamado' });
+    }
+});
+
+// ... (resto do arquivo igual)
 
 // Inicializa o banco
 sequelize.sync().then(() => {
@@ -107,6 +131,48 @@ app.post('/api/ticket/auto', async (req, res) => {
     }
 });
 
+app.get('/api/stats/hoje', async (req, res) => {
+    try {
+        // Ordena por data (mais recentes primeiro)
+        const tickets = await Ticket.findAll({ order: [['timestamp', 'DESC']] });
+        
+        // Listas Filtradas
+        const listTotal = tickets;
+        const listHumanos = tickets.filter(t => t.status === 'solucionado');
+        const listRobo = tickets.filter(t => t.status === 'auto_solucionado');
+        const listN3 = tickets.filter(t => t.status === 'n3');
+
+        // Agrupamento para o gráfico (Mantido igual)
+        const categorias = {};
+        tickets.forEach(t => {
+            let cat = t.setor === 'Autoatendimento' ? 'Robô (Auto)' : t.problema.split(']')[0].replace('[','').trim();
+            if(cat.length > 20) cat = "Geral"; 
+            categorias[cat] = (categorias[cat] || 0) + 1;
+        });
+
+        res.json({
+            // Contadores (KPIs)
+            total: listTotal.length,
+            resolvidos_humanos: listHumanos.length,
+            resolvidos_robo: listRobo.length,
+            escalados_n3: listN3.length,
+            
+            // Listas para o Modal (NOVO!)
+            detalhes: {
+                total: listTotal,
+                humanos: listHumanos,
+                robo: listRobo,
+                n3: listN3
+            },
+
+            // Gráfico
+            grafico: categorias
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Erro ao gerar estatisticas' });
+    }
+});
+
 // --- 5. Start ---
 const PORT = 3000;
 server.listen(PORT, () => {
@@ -114,5 +180,6 @@ server.listen(PORT, () => {
     console.log(`🚀 NTI Sentinel rodando em http://localhost:${PORT}`);
     console.log(`📱 Usuário: http://localhost:${PORT}/index.html`);
     console.log(`🖥️ Dashboard: http://localhost:${PORT}/dashboard.html`);
+    console.log(`📊 Gestor: http://localhost:${PORT}/gestor.html`);
     console.log('------------------------------------------------');
 });
