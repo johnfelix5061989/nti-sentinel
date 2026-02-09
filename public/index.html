@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suporte NTI - CIODS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #13293D;
+            --bg-surface: #006494;
+            --accent-1: #247BA0;
+            --accent-bright: #1B98E0;
+            --text-light: #E8F1F2;
+        }
+        body { background-color: var(--bg-deep); color: var(--text-light); font-family: 'Segoe UI', sans-serif; }
+        
+        .chat-container { 
+            max-width: 500px; 
+            margin: 40px auto; 
+            background: var(--bg-surface); 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--accent-1);
+        }
+        
+        .bot-msg { background: var(--accent-1); padding: 12px; border-radius: 15px 15px 15px 0; margin-bottom: 10px; width: fit-content; color: white; }
+        .user-msg { background: var(--accent-bright); color: var(--bg-deep); padding: 12px; border-radius: 15px 15px 0 15px; margin-bottom: 10px; margin-left: auto; width: fit-content; font-weight: 700; }
+        
+        /* Botões */
+        .btn-outline-custom { color: var(--text-light); border-color: var(--accent-bright); margin-bottom: 5px; }
+        .btn-outline-custom:hover { background-color: var(--accent-bright); color: var(--bg-deep); }
+        
+        /* Inputs do Formulário */
+        .form-control { background-color: var(--bg-deep); border: 1px solid var(--accent-1); color: var(--text-light); }
+        .form-control:focus { background-color: var(--bg-deep); color: white; border-color: var(--accent-bright); box-shadow: none; }
+        .form-control::placeholder { color: #8faab9; }
+
+        .hidden { display: none; }
+        .fade-in { animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="chat-container fade-in">
+        <div class="text-center mb-3">
+            <h5 style="color: var(--accent-bright)">🤖 NTI - CIODS</h5>
+            <small class="text-light opacity-75">Autoatendimento Inteligente</small>
+        </div>
+
+        <div id="chat-box" style="height:350px; overflow-y:auto; padding-right: 5px;">
+            <div class="bot-msg">Olá! Qual o problema que você está enfrentando?</div>
+        </div>
+
+        <div id="opcoes" class="d-grid gap-2 mt-3">
+            <button class="btn btn-outline-custom" onclick="conversa('internet')">📶 Sem Internet (cabo)</button>
+            <button class="btn btn-outline-custom" onclick="conversa('wifi')">📡 Wi-Fi</button>
+            <button class="btn btn-outline-custom" onclick="conversa('impressora')">🖨️ Impressora</button>
+            <button class="btn btn-outline-custom" onclick="conversa('monitor')">🖥️ Monitor</button>
+            <button class="btn btn-outline-custom" onclick="conversa('periferico')">⌨️ Mouse / Teclado</button>
+            <button class="btn btn-outline-custom" onclick="conversa('energia')">🔌 Energia / Tomada</button>
+            <button class="btn btn-outline-secondary mt-2" onclick="mostrarFormulario('Outros')">📝 Outro Problema</button>
+        </div>
+
+        <div id="form-chamado" class="hidden mt-3 fade-in">
+            <h6 class="text-info mb-3">Abrir Chamado Técnico</h6>
+            <input type="text" id="nome" class="form-control mb-2" placeholder="Seu Nome Completo">
+            <input type="text" id="setor" class="form-control mb-2" placeholder="Seu Setor">
+            <input type="hidden" id="assunto-pre" value="">
+            <textarea id="desc" class="form-control mb-2" rows="2" placeholder="Descreva detalhes (ex: número da sala/patrimônio)..."></textarea>
+            
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary w-50" onclick="cancelar()">Voltar</button>
+                <button class="btn btn-primary w-50" style="background: var(--accent-bright); border: none;" onclick="enviarChamado()">🚀 Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const box = document.getElementById('chat-box');
+const opcoes = document.getElementById('opcoes');
+const form = document.getElementById('form-chamado');
+
+function addUser(msg){
+    box.innerHTML += `<div class="user-msg fade-in">${msg}</div>`;
+}
+
+function addBot(msg){
+    box.innerHTML += `<div class="bot-msg fade-in">${msg}</div>`;
+    box.scrollTop = box.scrollHeight;
+}
+
+// Prepara o formulário caso não resolva
+// Substitua a função finalizar() antiga por esta:
+function finalizar(assunto){
+    opcoes.innerHTML = `
+        <div class="row g-2">
+            <div class="col-6">
+                <button class="btn btn-success w-100" onclick="registrarAutoResolucao('${assunto}')">✅ Resolveu</button>
+            </div>
+            <div class="col-6">
+                <button class="btn btn-danger w-100" onclick="mostrarFormulario('${assunto}')">❌ Não resolveu</button>
+            </div>
+        </div>
+    `;
+}
+
+// Adicione esta nova função para salvar o sucesso do Chatbot:
+async function registrarAutoResolucao(assunto) {
+    // Feedback visual imediato
+    opcoes.innerHTML = `<div class="alert alert-success text-center">🎉 Que bom! O NTI agradece.</div>`;
+    addBot("Fico feliz em ter ajudado! O caso foi registrado como solucionado.");
+    
+    // Envia para o servidor silenciosamente
+    try {
+        await fetch('/api/ticket/auto', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                solicitante: "Usuário Web", 
+                problema: `[${assunto}] Resolvido via Chatbot` 
+            })
+        });
+    } catch (e) { console.error("Erro ao salvar log", e); }
+
+    // Reinicia após 4 segundos
+    setTimeout(() => location.reload(), 4000);
+}
+
+function mostrarFormulario(assunto) {
+    opcoes.classList.add('hidden');
+    form.classList.remove('hidden');
+    document.getElementById('assunto-pre').value = assunto;
+    // Adiciona mensagem automática no chat
+    addBot(`Entendido. Por favor, preencha seus dados para que eu chame um técnico para verificar o problema de: <strong>${assunto}</strong>.`);
+}
+
+function cancelar() {
+    form.classList.add('hidden');
+    opcoes.classList.remove('hidden');
+    opcoes.innerHTML = `<button class="btn btn-primary w-100" onclick="location.reload()">🔄 Reiniciar Atendimento</button>`;
+}
+
+function conversa(tipo){
+    let r = "";
+    let assunto = "";
+
+    if(tipo === 'internet'){
+        addUser("Estou sem internet (cabo)");
+        assunto = "Internet Cabeada";
+        r = `1) Verifique se o cabo está conectado firmemente.<br>
+             2) Veja se há luzes piscando na porta de rede (trás do PC).<br>
+             3) Reinicie o computador.<br>
+             4) Se nada piscar, o cabo pode estar danificado.`;
+    }
+
+    if(tipo === 'wifi'){
+        addUser("Wi-Fi não conecta");
+        assunto = "Wi-Fi";
+        r = `1) Desligue e ligue o Wi-Fi do seu dispositivo.<br>
+             2) Verifique se está na rede correta da instituição.<br>
+             3) Reinicie o computador.<br>
+             4) "Esquecer" a rede e conectar novamente.`;
+    }
+
+    if(tipo === 'impressora'){
+        addUser("Impressora não imprime");
+        assunto = "Impressora";
+        r = `1) Verifique se há papel e se está ligada.<br>
+             2) Confira o cabo USB.<br>
+             3) Verifique se há luzes de erro piscando na impressora.<br>
+             4) Reinicie o computador.`;
+    }
+
+    if(tipo === 'monitor'){
+        addUser("Monitor não liga / sem imagem");
+        assunto = "Monitor";
+        r = `1) Verifique a tomada e o cabo de força.<br>
+             2) Aperte o botão Power do monitor.<br>
+             3) Verifique o cabo de vídeo (VGA/HDMI).<br>
+             4) Teste em outra tomada.`;
+    }
+
+    if(tipo === 'periferico'){
+        addUser("Mouse ou teclado ruim");
+        assunto = "Periféricos";
+        r = `1) Troque de porta USB.<br>
+             2) Se for sem fio, troque as pilhas.<br>
+             3) Reinicie o computador.`;
+    }
+
+    if(tipo === 'energia'){
+        addUser("PC não liga");
+        assunto = "Energia/Elétrica";
+        r = `1) Verifique se o estabilizador/filtro está ligado.<br>
+             2) Teste a tomada com outro aparelho (carregador celular).<br>
+             3) Verifique os cabos de força atrás da CPU.`;
+    }
+
+    setTimeout(()=>{
+        addBot(r);
+        finalizar(assunto);
+    }, 400);
+}
+
+// --- INTEGRAÇÃO COM BACKEND ---
+async function enviarChamado() {
+    const nome = document.getElementById('nome').value;
+    const setor = document.getElementById('setor').value;
+    const assunto = document.getElementById('assunto-pre').value;
+    const descExtra = document.getElementById('desc').value;
+
+    if(!nome || !setor) return alert('Por favor, preencha Nome e Setor!');
+
+    // Combina o assunto automático com a descrição do usuário
+    const problemaFinal = `[${assunto}] ${descExtra}`;
+
+    try {
+        const res = await fetch('/api/ticket', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ solicitante: nome, setor: setor, problema: problemaFinal })
+        });
+
+        if(res.ok) {
+            form.classList.add('hidden');
+            box.innerHTML += `
+                <div class="bot-msg" style="background-color: #2ecc71;">
+                    ✅ <strong>Chamado Criado!</strong><br>
+                    ID gerado. Em breve, um analista do NTI irá atendê-lo(a).
+                </div>
+            `;
+            box.scrollTop = box.scrollHeight;
+            setTimeout(() => location.reload(), 5000); // Reinicia após 5s
+        } else {
+            alert('Erro ao comunicar com o servidor.');
+        }
+    } catch (e) {
+        alert('Erro de conexão. Verifique se o servidor está rodando.');
+        console.error(e);
+    }
+}
+</script>
+
+</body>
+</html>
