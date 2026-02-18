@@ -23,7 +23,7 @@
             min-height: 100vh; 
         }
 
-        /* BOTÃO HOME (NOVO) */
+        /* BOTÃO HOME */
         .btn-home {
             position: absolute;
             top: 15px;
@@ -58,11 +58,10 @@
         .bot-msg { background: var(--accent-1); padding: 12px; border-radius: 15px 15px 15px 0; margin-bottom: 10px; width: fit-content; color: white; }
         .user-msg { background: var(--accent-bright); color: var(--bg-deep); padding: 12px; border-radius: 15px 15px 0 15px; margin-bottom: 10px; margin-left: auto; width: fit-content; font-weight: 700; }
         
-        /* Botões Padrão */
         .btn-outline-custom { color: var(--text-light); border-color: var(--accent-bright); margin-bottom: 5px; }
         .btn-outline-custom:hover { background-color: var(--accent-bright); color: var(--bg-deep); }
         
-        /* Botão DESTAQUE (Não Encontrei) */
+        /* Botão Vermelho de Desvio */
         .btn-nao-encontrei {
             background-color: #c0392b;
             color: white;
@@ -78,8 +77,7 @@
             transform: scale(1.02);
             color: white;
         }
-        
-        /* Inputs do Formulário */
+
         .form-control { background-color: var(--bg-deep); border: 1px solid var(--accent-1); color: var(--text-light); }
         .form-control:focus { background-color: var(--bg-deep); color: white; border-color: var(--accent-bright); box-shadow: none; }
         .form-control::placeholder { color: #8faab9; }
@@ -148,7 +146,17 @@
                 </div>
             </div>
 
-            <input type="text" id="setor" class="form-control mb-2" placeholder="Seu Setor">
+            <select id="select-setor" class="form-control mb-2" onchange="verificarOutroSetor()">
+                <option value="" disabled selected>Selecione seu Setor...</option>
+                <option value="CICCE/OPERAÇÕES">CICCE/OPERAÇÕES</option>
+                <option value="SALA DE CRISES">SALA DE CRISES</option>
+                <option value="CALL CENTER">CALL CENTER</option>
+                <option value="DESPACHO">DESPACHO</option>
+                <option value="OUTROS">OUTROS (Digitar manual...)</option>
+            </select>
+            
+            <input type="text" id="input-outro-setor" class="form-control mb-2 hidden" placeholder="Digite o nome do setor...">
+
             <input type="hidden" id="assunto-pre" value="">
             <textarea id="desc" class="form-control mb-2" rows="2" placeholder="Descreva detalhes..."></textarea>
             
@@ -170,42 +178,37 @@ const opcoes = document.getElementById('opcoes');
 const form = document.getElementById('form-chamado');
 let menuPrincipalHTML = "";
 
-// Salva o menu original assim que a página carrega
 window.onload = function() {
     menuPrincipalHTML = opcoes.innerHTML;
 }
 
-function addUser(msg){
-    box.innerHTML += `<div class="user-msg fade-in">${msg}</div>`;
-}
+function addUser(msg){ box.innerHTML += `<div class="user-msg fade-in">${msg}</div>`; }
+function addBot(msg){ box.innerHTML += `<div class="bot-msg fade-in">${msg}</div>`; box.scrollTop = box.scrollHeight; }
 
-function addBot(msg){
-    box.innerHTML += `<div class="bot-msg fade-in">${msg}</div>`;
-    box.scrollTop = box.scrollHeight;
-}
-
-// RESTAURA O MENU PRINCIPAL
 function voltarMenu() {
     opcoes.innerHTML = menuPrincipalHTML;
-    addBot("Sem problemas. Selecione outra opção abaixo:");
+    addBot("Selecione outra opção:");
+}
+
+function verificarOutroSetor() {
+    const select = document.getElementById('select-setor');
+    const inputOutro = document.getElementById('input-outro-setor');
+    if (select.value === 'OUTROS') {
+        inputOutro.classList.remove('hidden');
+        inputOutro.focus();
+    } else {
+        inputOutro.classList.add('hidden');
+        inputOutro.value = '';
+    }
 }
 
 function finalizar(assunto){
-    // ADICIONADO BOTAO DE VOLTAR AQUI
     opcoes.innerHTML = `
         <div class="row g-2">
-            <div class="col-12">
-                <p class="text-white text-center mb-2">Isso resolveu?</p>
-            </div>
-            <div class="col-4">
-                <button class="btn btn-success w-100" onclick="registrarAutoResolucao('${assunto}')">✅ Sim</button>
-            </div>
-            <div class="col-4">
-                <button class="btn btn-danger w-100" onclick="mostrarFormulario('${assunto}')">❌ Não</button>
-            </div>
-            <div class="col-4">
-                <button class="btn btn-secondary w-100" onclick="voltarMenu()">↩️ Voltar</button>
-            </div>
+            <div class="col-12"><p class="text-white text-center mb-2">Isso resolveu?</p></div>
+            <div class="col-4"><button class="btn btn-success w-100" onclick="registrarAutoResolucao('${assunto}')">✅ Sim</button></div>
+            <div class="col-4"><button class="btn btn-danger w-100" onclick="mostrarFormulario('${assunto}')">❌ Não</button></div>
+            <div class="col-4"><button class="btn btn-secondary w-100" onclick="voltarMenu()">↩️ Voltar</button></div>
         </div>
     `;
 }
@@ -213,18 +216,13 @@ function finalizar(assunto){
 async function registrarAutoResolucao(assunto) {
     opcoes.innerHTML = `<div class="alert alert-success text-center">🎉 Que bom! O NTI agradece.</div>`;
     addBot("Fico feliz em ter ajudado! O caso foi registrado como solucionado.");
-    
     try {
         await fetch('/api/ticket/auto', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                solicitante: "Usuário Web", 
-                problema: `[${assunto}] Resolvido via Chatbot` 
-            })
+            body: JSON.stringify({ solicitante: "Usuário Web", problema: `[${assunto}] Resolvido via Chatbot` })
         });
     } catch (e) { console.error("Erro ao salvar log", e); }
-
     setTimeout(() => location.reload(), 4000);
 }
 
@@ -232,20 +230,20 @@ function mostrarFormulario(assunto) {
     opcoes.classList.add('hidden');
     form.classList.remove('hidden');
     document.getElementById('assunto-pre').value = assunto;
-    addBot(`Entendido. Por favor, preencha seus dados para que eu chame um técnico para verificar o problema de: <strong>${assunto}</strong>.`);
+    addBot(`Entendido. Preencha seus dados para abrir o chamado: <strong>${assunto}</strong>.`);
 }
 
 function cancelar() {
     form.classList.add('hidden');
     opcoes.classList.remove('hidden');
-    voltarMenu(); // Ao cancelar, restaura o menu completo
+    voltarMenu(); 
 }
+
+// --- CONTEÚDO COMPLETO DO CHATBOT ---
 
 function conversa(tipo){
     let r = "";
     let assunto = "";
-
-    // --- TEXTOS RESTAURADOS INTEGRALMENTE ---
 
     if(tipo === 'lento'){
         addUser("Computador está lento");
@@ -374,46 +372,43 @@ function conversa(tipo){
              3) Verifique os cabos de força atrás da CPU.`;
     }
 
-    setTimeout(()=>{
-        addBot(r);
-        addBot("Isso ajudou?");
-        finalizar(assunto);
-    }, 400);
+    setTimeout(()=>{ addBot(r); addBot("Isso ajudou?"); finalizar(assunto); }, 400);
 }
 
 async function enviarChamado() {
     const nome = document.getElementById('nome').value;
     const matricula = document.getElementById('matricula').value;
-    const setor = document.getElementById('setor').value;
+    
+    // Lógica Setor (Select vs Manual)
+    const selectSetor = document.getElementById('select-setor');
+    let setorReal = selectSetor.value;
+    if (setorReal === 'OUTROS') {
+        setorReal = document.getElementById('input-outro-setor').value;
+    }
+    
+    if(!nome || !setorReal || !matricula) return alert('Por favor, preencha Nome, Matrícula e selecione o Setor!');
+
     const assunto = document.getElementById('assunto-pre').value;
     const descExtra = document.getElementById('desc').value;
-
-    if(!nome || !setor || !matricula) return alert('Por favor, preencha Nome, Matrícula e Setor!');
-
     const problemaFinal = `[${assunto}] ${descExtra}`;
 
     try {
         const res = await fetch('/api/ticket', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ solicitante: nome, matricula: matricula, setor: setor, problema: problemaFinal })
+            body: JSON.stringify({ solicitante: nome, matricula: matricula, setor: setorReal, problema: problemaFinal })
         });
 
         if(res.ok) {
             form.classList.add('hidden');
-            box.innerHTML += `
-                <div class="bot-msg" style="background-color: #2ecc71;">
-                    ✅ <strong>Chamado Criado!</strong><br>
-                    ID gerado. Em breve, um analista do NTI irá atendê-lo(a).
-                </div>
-            `;
+            box.innerHTML += `<div class="bot-msg" style="background-color: #2ecc71;">✅ <strong>Chamado Criado!</strong><br>ID gerado. Em breve, um analista do NTI irá atendê-lo(a).</div>`;
             box.scrollTop = box.scrollHeight;
             setTimeout(() => location.reload(), 5000);
         } else {
             alert('Erro ao comunicar com o servidor.');
         }
     } catch (e) {
-        alert('Erro de conexão. Verifique se o servidor está rodando.');
+        alert('Erro de conexão.');
         console.error(e);
     }
 }

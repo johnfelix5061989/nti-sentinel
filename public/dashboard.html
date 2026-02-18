@@ -19,13 +19,16 @@
             font-family: 'Segoe UI', sans-serif; 
             margin: 0;
             overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
         }
 
-        /* Wrapper para efeito de blur no bloqueio */
+        /* Wrapper para efeito de blur */
         #app-content {
             display: flex; 
             flex-direction: column; 
-            min-height: 100vh;
+            flex: 1;
             filter: blur(15px);
             pointer-events: none;
             transition: filter 0.5s ease;
@@ -40,7 +43,29 @@
             align-items: center; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
         }
+
+        /* --- BARRA DE PRODUTIVIDADE (NOVO) --- */
+        .stats-bar {
+            background: rgba(0,0,0,0.2);
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            text-align: center;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; line-height: 1; }
+        .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
         
+        /* Cores dos Status */
+        .color-total { color: #ffffff; }
+        .color-team { color: #00d2d3; text-shadow: 0 0 10px rgba(0, 210, 211, 0.4); } /* Destaque para N1/N2 */
+        .color-bot { color: #fdcb6e; }
+        .color-n3 { color: #ff6b6b; }
+
+        /* Cards de Chamados */
         .card-ticket { 
             background: var(--bg-surface); 
             border: none; 
@@ -99,7 +124,6 @@
             border-top: 1px solid rgba(255,255,255,0.05); 
         }
 
-        /* Input Group para Senha */
         .input-group-text { background: var(--accent-bright); border: none; color: white; cursor: pointer; }
     </style>
 </head>
@@ -113,12 +137,10 @@
             </div>
             <div class="modal-body text-center">
                 <p class="text-light opacity-75">Acesso Restrito ao Operador</p>
-                
                 <div class="input-group mb-3">
                     <input type="password" id="senhaInput" class="form-control text-center" placeholder="Senha..." style="font-size: 1.2rem;">
                     <span class="input-group-text" onclick="toggleSenha()">👁️</span>
                 </div>
-
                 <p id="erroSenha" class="text-danger fw-bold" style="display: none;">Senha incorreta!</p>
                 <button class="btn btn-primary w-100 py-2" onclick="verificarSenha()" style="background: var(--accent-bright); font-weight: bold;">ACESSAR SISTEMA</button>
             </div>
@@ -138,7 +160,30 @@
         </div>
     </div>
 
-    <div class="container-fluid mt-4">
+    <div class="stats-bar">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col stat-item">
+                    <div class="stat-val color-total" id="st-total">0</div>
+                    <div class="stat-label">Demanda Total</div>
+                </div>
+                <div class="col stat-item">
+                    <div class="stat-val color-team" id="st-humanos">0</div>
+                    <div class="stat-label">Resolvidos (N1/N2)</div>
+                </div>
+                <div class="col stat-item">
+                    <div class="stat-val color-bot" id="st-bot">0</div>
+                    <div class="stat-label">Chatbot</div>
+                </div>
+                <div class="col stat-item">
+                    <div class="stat-val color-n3" id="st-n3">0</div>
+                    <div class="stat-label">Escalados (N3)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid mt-2">
         <div class="row" id="lista-chamados"></div>
         
         <div id="empty-state" class="text-center mt-5" style="display: none; color: var(--accent-1);">
@@ -229,16 +274,20 @@
         // Relógio
         setInterval(() => { document.getElementById('relogio').innerText = new Date().toLocaleTimeString('pt-BR'); }, 1000);
         
-        // Busca Inicial
+        // Busca Inicial de Chamados
         fetch('/api/tickets/ativos').then(r => r.json()).then(tickets => {
             if(tickets.length === 0) emptyState.style.display = 'block';
             tickets.forEach(adicionarCard);
         });
 
+        // Busca Inicial de Métricas (NOVO)
+        atualizarMetricas();
+
         // Eventos Socket
         socket.on('novo_chamado', (t) => { 
             emptyState.style.display = 'none'; 
             adicionarCard(t); 
+            atualizarMetricas(); // Atualiza contador
             new Audio('https://freesound.org/data/previews/250/250629_4486188-lq.mp3').play().catch(()=>{}); 
         });
 
@@ -247,10 +296,10 @@
             if(c){ 
                 c.style.transform="scale(0.8)"; c.style.opacity="0"; 
                 setTimeout(()=>{ c.remove(); if(lista.children.length===0)emptyState.style.display='block'; },300); 
-            } 
+            }
+            atualizarMetricas(); // Atualiza contador após resolver
         });
 
-        // Refresh Automático (Turno 07:00)
         socket.on('refresh_dashboard', () => {
             console.log("Atualizando turno...");
             lista.innerHTML = '';
@@ -258,7 +307,22 @@
                 if(tickets.length === 0) emptyState.style.display = 'block';
                 else { emptyState.style.display = 'none'; tickets.forEach(adicionarCard); }
             });
+            atualizarMetricas();
         });
+    }
+
+    // Função para buscar e exibir os números (NOVO)
+    async function atualizarMetricas() {
+        try {
+            const res = await fetch('/api/stats/hoje');
+            const data = await res.json();
+            
+            // Animação simples de número mudando
+            document.getElementById('st-total').innerText = data.total;
+            document.getElementById('st-humanos').innerText = data.resolvidos_humanos;
+            document.getElementById('st-bot').innerText = data.resolvidos_robo;
+            document.getElementById('st-n3').innerText = data.escalados_n3;
+        } catch(e) { console.error("Erro metricas", e); }
     }
 
     function adicionarCard(t) {
@@ -298,7 +362,7 @@
     async function resolver(res) {
         const id = document.getElementById('ticketId').value; 
         const sol = document.getElementById('solucaoTexto').value;
-        const analista = "Operador NTI"; // Nome fixo para log (pode mudar se quiser)
+        const analista = "Operador NTI"; 
 
         if(!sol) return alert("Descreva a solução.");
         

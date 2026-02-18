@@ -1,0 +1,7 @@
+ID,ABERTURA,SOLICITANTE,SETOR,PROBLEMA,STATUS
+1,Wed Feb 18 2026 17:29:38 GMT-0300 (Horário Padrão de Brasília),Fernando,CALL CENTER,[Internet Cabeada] Computador continua sem net,solucionado
+2,Wed Feb 18 2026 17:30:21 GMT-0300 (Horário Padrão de Brasília),Carla,Secretaria da Sala de Crises,[Impressora] Impressora não funciona,n3
+3,Wed Feb 18 2026 17:30:57 GMT-0300 (Horário Padrão de Brasília),Josefa,Polícia Científica,[Energia/Elétrica] Testei e estabilizador não funciona,solucionado
+4,Wed Feb 18 2026 17:32:02 GMT-0300 (Horário Padrão de Brasília),Delegado José,CICCE/OPERAÇÕES,"[Senha / Acesso] Não consegui solucionar
+",solucionado
+5,Wed Feb 18 2026 17:36:50 GMT-0300 (Horário Padrão de Brasília),Usuário Web,Autoatendimento,[Áudio] Resolvido via Chatbot,auto_solucionado

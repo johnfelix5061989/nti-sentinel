@@ -11,21 +11,22 @@
             font-family: 'Segoe UI', sans-serif;
             display: flex;
             flex-direction: column;
-            min-height: 100vh; /* Garante que o footer vá para o final */
+            min-height: 100vh;
         }
         .card-filter { background: #1f3a52; border: 1px solid #247BA0; padding: 20px; border-radius: 10px; }
         .table-custom { background: #1f3a52; color: #fff; }
         .table-custom th { background: #006494; color: white; }
         .metric-box { background: #006494; padding: 15px; border-radius: 8px; text-align: center; }
+        .btn-download { background: #27ae60; color: white; border: none; padding: 5px 15px; border-radius: 5px; text-decoration: none; font-size: 0.8rem; }
+        .btn-download:hover { background: #2ecc71; color: white; }
 
-        /* Estilo do Rodapé */
         footer {
-            margin-top: auto; /* Empurra para o fundo da página */
-            text-align: center;
-            padding: 20px;
-            font-size: 0.85rem;
-            color: #E8F1F2;
-            opacity: 0.5;
+            margin-top: auto; 
+            text-align: center; 
+            padding: 20px; 
+            font-size: 0.85rem; 
+            color: #E8F1F2; 
+            opacity: 0.5; 
             border-top: 1px solid rgba(255,255,255,0.1);
         }
     </style>
@@ -38,6 +39,7 @@
         <a href="gestor.html" class="btn btn-outline-light">⬅ Voltar ao Gestor</a>
     </div>
 
+    <h5 class="text-info mb-3">🔍 Chamados Recentes (Banco de Dados)</h5>
     <div class="card-filter mb-4">
         <div class="row g-3">
             <div class="col-md-3">
@@ -64,34 +66,47 @@
         </div>
         <div class="mt-3 d-flex gap-2">
             <button class="btn btn-primary" onclick="carregarHistorico()">🔍 Filtrar</button>
-            <button class="btn btn-success" onclick="exportarCsv()">📥 Exportar CSV</button>
+            <button class="btn btn-secondary" onclick="exportarCsvBanco()">📄 Exportar Esta Busca</button>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-3"><div class="metric-box"><h5>Total</h5><h3 id="m-total">0</h3></div></div>
-        <div class="col-md-3"><div class="metric-box"><h5>Resolvidos</h5><h3 id="m-resolvidos">0</h3></div></div>
-        <div class="col-md-3"><div class="metric-box"><h5>N3 (Infra)</h5><h3 id="m-n3">0</h3></div></div>
-        <div class="col-md-3"><div class="metric-box"><h5>Tempo Médio</h5><h3 id="m-tempo">-</h3></div></div>
-    </div>
-
-    <div class="table-responsive">
+    <div class="table-responsive mb-5">
         <table class="table table-custom table-hover">
             <thead>
                 <tr>
                     <th>ID</th>
                     <th>Data/Hora</th>
                     <th>Solicitante</th>
+                    <th>Setor</th>
                     <th>Problema</th>
-                    <th>Prioridade</th>
                     <th>Status</th>
                     <th>Analista</th>
-                    <th>Tempo</th>
                 </tr>
             </thead>
-            <tbody id="tabelaHistorico">
-                </tbody>
+            <tbody id="tabelaHistorico"></tbody>
         </table>
+        <p class="text-muted text-center" id="msg-sem-dados" style="display:none">Nenhum registro encontrado no filtro atual.</p>
+    </div>
+
+    <hr style="border-color: #247BA0; opacity: 0.5;">
+
+    <h5 class="text-warning mb-3 mt-4">📂 Arquivos de Turno (Backups Fechados)</h5>
+    <p class="small text-muted">Estes arquivos contêm os chamados finalizados e removidos do banco diariamente às 07:00.</p>
+    
+    <div class="card-filter">
+        <div class="table-responsive">
+            <table class="table table-dark table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Ano</th>
+                        <th>Arquivo de Log</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaLogs">
+                    </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -100,60 +115,89 @@
 </footer>
 
 <script>
-    // Define datas padrão (últimos 7 dias)
+    // Configura datas iniciais
     window.onload = () => {
         const hoje = new Date().toISOString().split('T')[0];
         const semanaPassada = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         document.getElementById('dataFim').value = hoje;
         document.getElementById('dataInicio').value = semanaPassada;
-        carregarHistorico();
+        
+        carregarHistorico(); // Carrega tabela do banco
+        carregarLogs();      // Carrega lista de arquivos CSV
     }
 
+    // --- FUNÇÕES DE BUSCA (BANCO) ---
     async function carregarHistorico() {
         const inicio = document.getElementById('dataInicio').value;
         const fim = document.getElementById('dataFim').value;
         const status = document.getElementById('statusFilter').value;
         const busca = document.getElementById('buscaText').value;
 
-        const res = await fetch(`/api/historico?inicio=${inicio}&fim=${fim}&status=${status}&busca=${busca}`);
-        const dados = await res.json();
-        
-        atualizarTabela(dados);
-        atualizarMetricas(dados);
+        try {
+            const res = await fetch(`/api/historico?inicio=${inicio}&fim=${fim}&status=${status}&busca=${busca}`);
+            const dados = await res.json();
+            
+            const tbody = document.getElementById('tabelaHistorico');
+            tbody.innerHTML = '';
+            
+            if(dados.length === 0) {
+                document.getElementById('msg-sem-dados').style.display = 'block';
+            } else {
+                document.getElementById('msg-sem-dados').style.display = 'none';
+                dados.forEach(t => {
+                    const dataFmt = new Date(t.timestamp).toLocaleString('pt-BR');
+                    const badge = t.prioridade === 'Alta' ? '<span class="badge bg-danger">Alta</span>' : '';
+                    const row = `
+                        <tr>
+                            <td>#${t.id}</td>
+                            <td>${dataFmt}</td>
+                            <td>${t.solicitante} <br><small class="text-muted">${t.matricula || ''}</small></td>
+                            <td>${t.setor} ${badge}</td>
+                            <td>${t.problema}</td>
+                            <td>${t.status}</td>
+                            <td>${t.analista || '-'}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            }
+        } catch(e) { console.error("Erro histórico", e); }
     }
 
-    function atualizarTabela(dados) {
-        const tbody = document.getElementById('tabelaHistorico');
-        tbody.innerHTML = '';
-        dados.forEach(t => {
-            const dataFmt = new Date(t.timestamp).toLocaleString('pt-BR');
-            const row = `
-                <tr>
-                    <td>#${t.id}</td>
-                    <td>${dataFmt}</td>
-                    <td>${t.solicitante} <small>(${t.matricula || '-'})</small></td>
-                    <td>${t.problema}</td>
-                    <td><span class="badge ${t.prioridade === 'Alta' ? 'bg-danger' : 'bg-secondary'}">${t.prioridade}</span></td>
-                    <td>${t.status}</td>
-                    <td>${t.analista || '-'}</td>
-                    <td>${t.tempo_resolucao || '-'}</td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
-        });
-    }
-
-    function atualizarMetricas(dados) {
-        document.getElementById('m-total').innerText = dados.length;
-        document.getElementById('m-resolvidos').innerText = dados.filter(t => t.status.includes('solucionado')).length;
-        document.getElementById('m-n3').innerText = dados.filter(t => t.status === 'n3').length;
-        // Cálculo simples de tempo médio poderia ser implementado aqui
-    }
-
-    function exportarCsv() {
+    function exportarCsvBanco() {
         const inicio = document.getElementById('dataInicio').value;
         const fim = document.getElementById('dataFim').value;
         window.location.href = `/api/exportar?inicio=${inicio}&fim=${fim}`;
+    }
+
+    // --- FUNÇÕES DE LOGS (CSV) ---
+    async function carregarLogs() {
+        try {
+            const res = await fetch('/api/logs-list');
+            const logs = await res.json();
+            const tbody = document.getElementById('tabelaLogs');
+            tbody.innerHTML = '';
+
+            if(logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">Nenhum arquivo de log gerado ainda.</td></tr>';
+                return;
+            }
+
+            logs.forEach(l => {
+                const row = `
+                    <tr>
+                        <td>${l.ano}</td>
+                        <td>📄 ${l.arquivo}</td>
+                        <td>
+                            <a href="/api/logs/download/${l.ano}/${l.arquivo}" class="btn-download" target="_blank">
+                                📥 Baixar CSV
+                            </a>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        } catch(e) { console.error("Erro logs", e); }
     }
 </script>
 </body>
