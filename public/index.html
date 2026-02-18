@@ -14,7 +14,6 @@
             --text-light: #E8F1F2;
         }
         
-        /* Ajuste no BODY para o rodapé ficar fixo embaixo */
         body { 
             background-color: var(--bg-deep); 
             color: var(--text-light); 
@@ -23,10 +22,32 @@
             flex-direction: column; 
             min-height: 100vh; 
         }
+
+        /* BOTÃO HOME (NOVO) */
+        .btn-home {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            text-decoration: none;
+            color: var(--accent-bright);
+            border: 1px solid var(--accent-bright);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            background: rgba(19, 41, 61, 0.8);
+        }
+        .btn-home:hover {
+            background-color: var(--accent-bright);
+            color: var(--bg-deep);
+            box-shadow: 0 0 10px var(--accent-bright);
+        }
         
         .chat-container { 
             max-width: 500px; 
-            margin: 40px auto; 
+            margin: 60px auto 40px auto; 
             background: var(--bg-surface); 
             padding: 25px; 
             border-radius: 15px; 
@@ -37,9 +58,26 @@
         .bot-msg { background: var(--accent-1); padding: 12px; border-radius: 15px 15px 15px 0; margin-bottom: 10px; width: fit-content; color: white; }
         .user-msg { background: var(--accent-bright); color: var(--bg-deep); padding: 12px; border-radius: 15px 15px 0 15px; margin-bottom: 10px; margin-left: auto; width: fit-content; font-weight: 700; }
         
-        /* Botões */
+        /* Botões Padrão */
         .btn-outline-custom { color: var(--text-light); border-color: var(--accent-bright); margin-bottom: 5px; }
         .btn-outline-custom:hover { background-color: var(--accent-bright); color: var(--bg-deep); }
+        
+        /* Botão DESTAQUE (Não Encontrei) */
+        .btn-nao-encontrei {
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 12px;
+            box-shadow: 0 4px 10px rgba(192, 57, 43, 0.4);
+            transition: transform 0.2s;
+        }
+        .btn-nao-encontrei:hover {
+            background-color: #e74c3c;
+            transform: scale(1.02);
+            color: white;
+        }
         
         /* Inputs do Formulário */
         .form-control { background-color: var(--bg-deep); border: 1px solid var(--accent-1); color: var(--text-light); }
@@ -50,19 +88,20 @@
         .fade-in { animation: fadeIn 0.5s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Estilo do Rodapé */
         footer {
-            margin-top: auto; /* Empurra para o fundo */
-            text-align: center;
-            padding: 20px;
-            font-size: 0.85rem;
-            color: var(--text-light);
-            opacity: 0.6;
-            border-top: 1px solid rgba(255,255,255,0.05);
+            margin-top: auto; 
+            text-align: center; 
+            padding: 20px; 
+            font-size: 0.85rem; 
+            color: var(--text-light); 
+            opacity: 0.6; 
+            border-top: 1px solid rgba(255,255,255,0.05); 
         }
     </style>
 </head>
 <body>
+
+    <a href="home.html" class="btn-home">🏠 Home</a>
 
 <div class="container">
     <div class="chat-container fade-in">
@@ -89,7 +128,12 @@
             <button class="btn btn-outline-custom" onclick="conversa('audio')">🔈 Sem Som</button>
             <button class="btn btn-outline-custom" onclick="conversa('arquivo')">📄 Arquivo não abre</button>
             <button class="btn btn-outline-custom" onclick="conversa('desliga')">🔄 PC desliga sozinho</button>
-            <button class="btn btn-outline-secondary mt-2" onclick="mostrarFormulario('Outros')">📝 Outro Problema</button>
+            
+            <button class="btn btn-outline-secondary mt-2" onclick="mostrarFormulario('Outros')">📝 Outro Problema (do NTI)</button>
+
+            <button class="btn btn-nao-encontrei" onclick="window.location.href='externo.html'">
+                🚨 NÃO ENCONTREI MEU PROBLEMA
+            </button>
         </div>
 
         <div id="form-chamado" class="hidden mt-3 fade-in">
@@ -117,13 +161,19 @@
 </div>
 
 <footer>
-        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+    <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
 </footer>
 
 <script>
 const box = document.getElementById('chat-box');
 const opcoes = document.getElementById('opcoes');
 const form = document.getElementById('form-chamado');
+let menuPrincipalHTML = "";
+
+// Salva o menu original assim que a página carrega
+window.onload = function() {
+    menuPrincipalHTML = opcoes.innerHTML;
+}
 
 function addUser(msg){
     box.innerHTML += `<div class="user-msg fade-in">${msg}</div>`;
@@ -134,14 +184,27 @@ function addBot(msg){
     box.scrollTop = box.scrollHeight;
 }
 
+// RESTAURA O MENU PRINCIPAL
+function voltarMenu() {
+    opcoes.innerHTML = menuPrincipalHTML;
+    addBot("Sem problemas. Selecione outra opção abaixo:");
+}
+
 function finalizar(assunto){
+    // ADICIONADO BOTAO DE VOLTAR AQUI
     opcoes.innerHTML = `
         <div class="row g-2">
-            <div class="col-6">
-                <button class="btn btn-success w-100" onclick="registrarAutoResolucao('${assunto}')">✅ Resolveu</button>
+            <div class="col-12">
+                <p class="text-white text-center mb-2">Isso resolveu?</p>
             </div>
-            <div class="col-6">
-                <button class="btn btn-danger w-100" onclick="mostrarFormulario('${assunto}')">❌ Não resolveu</button>
+            <div class="col-4">
+                <button class="btn btn-success w-100" onclick="registrarAutoResolucao('${assunto}')">✅ Sim</button>
+            </div>
+            <div class="col-4">
+                <button class="btn btn-danger w-100" onclick="mostrarFormulario('${assunto}')">❌ Não</button>
+            </div>
+            <div class="col-4">
+                <button class="btn btn-secondary w-100" onclick="voltarMenu()">↩️ Voltar</button>
             </div>
         </div>
     `;
@@ -175,105 +238,89 @@ function mostrarFormulario(assunto) {
 function cancelar() {
     form.classList.add('hidden');
     opcoes.classList.remove('hidden');
-    opcoes.innerHTML = `<button class="btn btn-primary w-100" onclick="location.reload()">🔄 Reiniciar Atendimento</button>`;
+    voltarMenu(); // Ao cancelar, restaura o menu completo
 }
 
 function conversa(tipo){
     let r = "";
     let assunto = "";
 
+    // --- TEXTOS RESTAURADOS INTEGRALMENTE ---
+
     if(tipo === 'lento'){
         addUser("Computador está lento");
         assunto = "Computador Lento";
-        r = `
-        1) Feche programas que não está utilizando.<br>
-        2) Pressione Ctrl + Shift + Esc → veja se há algo consumindo muita CPU ou Memória.<br>
-        3) Reinicie o computador.<br>
-        4) Verifique se o Disco C: está quase cheio.<br>
-        5) Se estiver lento ao iniciar, pode haver muitos programas na inicialização.<br><br>
-        ⚠️ Se continuar lento, pode ser problema de HD, memória RAM ou vírus.`;
+        r = `1) Feche programas que não está utilizando.<br>
+             2) Pressione Ctrl + Shift + Esc → veja se há algo consumindo muita CPU ou Memória.<br>
+             3) Reinicie o computador.<br>
+             4) Verifique se o Disco C: está quase cheio.<br>
+             5) Se estiver lento ao iniciar, pode haver muitos programas na inicialização.<br><br>
+             ⚠️ Se continuar lento, pode ser problema de HD, memória RAM ou vírus.`;
     }
 
     if(tipo === 'sistema'){
         addUser("Sistema institucional não abre");
         assunto = "Sistema Institucional";
-        r = `
-        1) Verifique se a internet está funcionando.<br>
-        2) Tente acessar outro site para confirmar conexão.<br>
-        3) Pressione Ctrl + F5 para atualizar forçado.<br>
-        4) Teste outro navegador.<br>
-        5) Observe se aparece mensagem de erro específica.<br><br>
-        ⚠️ Pode ser instabilidade do servidor.`;
+        r = `1) Verifique se a internet está funcionando.<br>
+             2) Tente acessar outro site para confirmar conexão.<br>
+             3) Pressione Ctrl + F5 para atualizar forçado.<br>
+             4) Teste outro navegador.<br>
+             5) Observe se aparece mensagem de erro específica.<br><br>
+             ⚠️ Pode ser instabilidade do servidor.`;
     }
 
     if(tipo === 'senha'){
         addUser("Problema com senha ou acesso");
         assunto = "Senha / Acesso";
-        r = `
-        1) Verifique se CAPS LOCK está ativado.<br>
-        2) Confirme se está digitando usuário correto.<br>
-        3) Reinicie o computador e tente novamente.<br>
-        4) Se bloqueado por tentativas, aguarde 15 minutos.<br><br>
-        🔐 Se persistir, será necessário reset de senha pelo NTI.`;
+        r = `1) Verifique se CAPS LOCK está ativado.<br>
+             2) Confirme se está digitando usuário correto.<br>
+             3) Reinicie o computador e tente novamente.<br>
+             4) Se bloqueado por tentativas, aguarde 15 minutos.<br><br>
+             🔐 Se persistir, será necessário reset de senha pelo NTI.`;
     }
 
     if(tipo === 'telaazul'){
         addUser("Apareceu tela azul");
         assunto = "Tela Azul";
-        r = `
-        1) Anote o código do erro exibido.<br>
-        2) Reinicie o computador.<br>
-        3) Se ocorrer novamente, pode indicar:<br>
-        - Problema de memória RAM<br>
-        - Driver incompatível<br>
-        - HD com falha<br><br>
-        ⚠️ Evite desligamentos forçados repetidos.`;
+        r = `1) Anote o código do erro exibido.<br>
+             2) Reinicie o computador.<br>
+             3) Se ocorrer novamente, pode indicar:<br>
+             - Problema de memória RAM<br>
+             - Driver incompatível<br>
+             - HD com falha<br><br>
+             ⚠️ Evite desligamentos forçados repetidos.`;
     }
 
     if(tipo === 'audio'){
         addUser("Computador está sem som");
         assunto = "Áudio";
-        r = `
-        1) Verifique se o volume não está no mudo.<br>
-        2) Clique no ícone de som e selecione dispositivo correto.<br>
-        3) Teste outro vídeo ou arquivo.<br>
-        4) Reinicie o computador.<br>
-        5) Se for headset USB, troque a porta.<br><br>
-        🔊 Pode ser driver de áudio.`;
+        r = `1) Verifique se o volume não está no mudo.<br>
+             2) Clique no ícone de som e selecione dispositivo correto.<br>
+             3) Teste outro vídeo ou arquivo.<br>
+             4) Reinicie o computador.<br>
+             5) Se for headset USB, troque a porta.<br><br>
+             🔊 Pode ser driver de áudio.`;
     }
 
     if(tipo === 'arquivo'){
         addUser("Arquivo não abre");
         assunto = "Arquivo não abre";
-        r = `
-        1) Verifique se possui o programa adequado instalado.<br>
-        2) Tente abrir em outro computador.<br>
-        3) Pode estar corrompido.<br>
-        4) Verifique se o arquivo foi baixado completamente.<br><br>
-        📄 Se necessário, enviar cópia para análise.`;
+        r = `1) Verifique se possui o programa adequado instalado.<br>
+             2) Tente abrir em outro computador.<br>
+             3) Pode estar corrompido.<br>
+             4) Verifique se o arquivo foi baixado completamente.<br><br>
+             📄 Se necessário, enviar cópia para análise.`;
     }
 
     if(tipo === 'desliga'){
         addUser("PC liga mas desliga sozinho");
         assunto = "Desligamento inesperado";
-        r = `
-        1) Verifique se há superaquecimento (ventoinhas funcionando?).<br>
-        2) Teste outra tomada.<br>
-        3) Verifique estabilizador/filtro de linha.<br>
-        4) Pode ser fonte com defeito.<br><br>
-        ⚠️ Não insista em ligar repetidamente.`;
+        r = `1) Verifique se há superaquecimento (ventoinhas funcionando?).<br>
+             2) Teste outra tomada.<br>
+             3) Verifique estabilizador/filtro de linha.<br>
+             4) Pode ser fonte com defeito.<br><br>
+             ⚠️ Não insista em ligar repetidamente.`;
     }
-
-    // Mantém seus casos antigos abaixo (internet, wifi, etc.)
-
-    setTimeout(()=>{
-        addBot(r);
-        addBot("Você conseguiu realizar todos os passos acima?");
-        finalizar(assunto);
-    }, 400);
-}
-    let r = "";
-    let assunto = "";
 
     if(tipo === 'internet'){
         addUser("Estou sem internet (cabo)");
@@ -329,19 +376,18 @@ function conversa(tipo){
 
     setTimeout(()=>{
         addBot(r);
+        addBot("Isso ajudou?");
         finalizar(assunto);
     }, 400);
+}
 
-
-// FUNÇÃO UNIFICADA E CORRIGIDA
 async function enviarChamado() {
     const nome = document.getElementById('nome').value;
-    const matricula = document.getElementById('matricula').value; // Pega o valor
+    const matricula = document.getElementById('matricula').value;
     const setor = document.getElementById('setor').value;
     const assunto = document.getElementById('assunto-pre').value;
     const descExtra = document.getElementById('desc').value;
 
-    // Validação Obrigatória
     if(!nome || !setor || !matricula) return alert('Por favor, preencha Nome, Matrícula e Setor!');
 
     const problemaFinal = `[${assunto}] ${descExtra}`;

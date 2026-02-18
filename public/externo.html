@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suporte Externo - CIODS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #13293D;
+            --bg-surface: #006494;
+            --accent-bright: #1B98E0;
+            --text-light: #E8F1F2;
+            --warning-bg: #c0392b;
+        }
+        
+        body { 
+            background-color: var(--bg-deep); 
+            color: var(--text-light); 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            text-align: center;
+        }
+
+        .container-aviso {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 30px;
+            background: var(--bg-surface);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid var(--warning-bg);
+        }
+
+        .alert-box {
+            background-color: rgba(192, 57, 43, 0.2);
+            border: 1px solid #e74c3c;
+            color: #ffcccc;
+            padding: 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        /* Classe atualizada para a imagem */
+        .img-telefones {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 5px solid white;
+            margin-bottom: 30px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .btn-voltar {
+            background: transparent;
+            border: 1px solid var(--accent-bright);
+            color: var(--text-light);
+            padding: 10px 30px;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .btn-voltar:hover {
+            background: var(--accent-bright);
+            color: var(--bg-deep);
+        }
+
+        footer {
+            margin-top: auto; 
+            padding: 20px; 
+            font-size: 0.85rem; 
+            opacity: 0.6; 
+            border-top: 1px solid rgba(255,255,255,0.05); 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="container-aviso fade-in">
+            <h1 style="color: #e74c3c; font-weight: 800; margin-bottom: 20px;">⚠️ ATENÇÃO</h1>
+            
+            <div class="alert-box">
+                SE VOCÊ NÃO ENCONTROU SEU PROBLEMA NO CHAT-BOT, PROVAVELMENTE NÃO É ALGO DA ALÇADA DO NTI.<br><br>
+                ASSIM, ENTRE EM CONTATO COM ALGUM DOS TELEFONES ABAIXO:
+            </div>
+
+            <img src="imagens/telefones.jpg" 
+                 alt="Lista de Telefones Úteis CIODS" 
+                 class="img-telefones" 
+                 onerror="this.style.display='none'; this.parentElement.innerHTML+='<p style=\'color:red\'>Imagem não encontrada. Verifique se o arquivo está em public/imagens/telefones.jpg</p>'">
+
+            <div class="mt-4">
+                <p class="mb-4">O NTI é responsável por <strong style="color: var(--bg-deep);">Computadores, Redes e Sistemas</strong>. 
+                    <br>
+                    Telefonia, HTs e outros tópicos são encargos de outros núcleos. 
+                    <br>
+                    A equipe NTI agradece pela sua interação!</p>
+                <a href="index.html" class="btn-voltar">⬅ Voltar ao Chat NTI</a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+    </footer>
+
+</body>
+</html>
