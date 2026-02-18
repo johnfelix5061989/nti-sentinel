@@ -5,6 +5,7 @@ const Sequelize = require('sequelize');
 const cron = require('node-cron');
 const { createObjectCsvWriter } = require('csv-writer');
 const fs = require('fs');
+const { Op } = require('sequelize');
 
 // --- 1. Configuração do Servidor ---
 const app = express();
@@ -21,12 +22,10 @@ const sequelize = new Sequelize({
     logging: false
 });
 
-// ... (início do arquivo igual)
-
-// 1. Atualize a Tabela no Banco
+// Modelo do Ticket (Tabela)
 const Ticket = sequelize.define('Ticket', {
     solicitante: Sequelize.STRING,
-    matricula: Sequelize.STRING, // <--- NOVO CAMPO
+    matricula: Sequelize.STRING, 
     setor: Sequelize.STRING,
     problema: Sequelize.STRING,
     status: { type: Sequelize.STRING, defaultValue: 'aberto' },
@@ -34,37 +33,21 @@ const Ticket = sequelize.define('Ticket', {
     timestamp: { type: Sequelize.DATE, defaultValue: Sequelize.NOW }
 });
 
-// ... (código do meio igual)
-
-// 2. Atualize a API que recebe o chamado
-app.post('/api/ticket', async (req, res) => {
-    try {
-        const { solicitante, matricula, setor, problema } = req.body; // <--- Recebe matricula
-        console.log(`📝 Novo chamado: ${solicitante} (${matricula})`);
-        
-        const novoTicket = await Ticket.create({ solicitante, matricula, setor, problema });
-        
-        io.emit('novo_chamado', novoTicket);
-        res.json({ success: true, ticket: novoTicket });
-    } catch (error) {
-        console.error("Erro:", error);
-        res.status(500).json({ error: 'Erro ao abrir chamado' });
-    }
-});
-
-// ... (resto do arquivo igual)
-
 // Inicializa o banco
 sequelize.sync().then(() => {
     console.log("💾 Banco de dados sincronizado.");
 });
 
 // --- 3. Rotas e APIs ---
+
+// ROTA 1: CRIAR CHAMADO (Apenas uma versão correta)
 app.post('/api/ticket', async (req, res) => {
     try {
-        const { solicitante, setor, problema } = req.body;
-        console.log(`📝 Novo chamado recebido de: ${solicitante}`);
-        const novoTicket = await Ticket.create({ solicitante, setor, problema });
+        const { solicitante, matricula, setor, problema } = req.body;
+        console.log(`📝 Novo chamado: ${solicitante} (Mat: ${matricula})`);
+        
+        const novoTicket = await Ticket.create({ solicitante, matricula, setor, problema });
+        
         io.emit('novo_chamado', novoTicket);
         res.json({ success: true, ticket: novoTicket });
     } catch (error) {
@@ -73,55 +56,36 @@ app.post('/api/ticket', async (req, res) => {
     }
 });
 
+// ROTA 2: ATUALIZAR STATUS (Resolver/Escalar)
 app.post('/api/ticket/update', async (req, res) => {
     const { id, status, solucao } = req.body;
     await Ticket.update({ status, solucao }, { where: { id } });
+    
+    // Busca o ticket atualizado para pegar os dados novos
+    const ticketAtualizado = await Ticket.findByPk(id);
+    
     io.emit('atualiza_chamado', { id, status });
     res.json({ success: true });
 });
 
+// ROTA 3: LISTAR ATIVOS (Para o Dashboard)
 app.get('/api/tickets/ativos', async (req, res) => {
     const tickets = await Ticket.findAll({ where: { status: 'aberto' } });
     res.json(tickets);
 });
 
-// --- 4. Rotina de Reset (07:00 AM) ---
-cron.schedule('0 7 * * *', async () => {
-    console.log('⏰ Executando rotina das 07h...');
-    const hoje = new Date().toISOString().split('T')[0];
-    const tickets = await Ticket.findAll();
-    
-    if (tickets.length > 0) {
-        if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
-        const csvWriter = createObjectCsvWriter({
-            path: `./logs/relatorio_${hoje}.csv`,
-            header: [
-                {id: 'id', title: 'ID'},
-                {id: 'solicitante', title: 'SOLICITANTE'},
-                {id: 'problema', title: 'PROBLEMA'},
-                {id: 'status', title: 'STATUS'},
-                {id: 'solucao', title: 'SOLUCAO'},
-                {id: 'createdAt', title: 'DATA'}
-            ]
-        });
-        await csvWriter.writeRecords(tickets.map(t => t.dataValues));
-        await Ticket.destroy({ where: {}, truncate: true });
-        io.emit('reset_diario');
-    }
-});
-
-// Rota para logar resoluções do Chatbot (Sem aparecer no Dashboard)
+// ROTA 4: CHATBOT (Autoatendimento)
 app.post('/api/ticket/auto', async (req, res) => {
     try {
         const { solicitante, problema } = req.body;
         
-        // Cria o ticket já como 'auto-solucionado'
         await Ticket.create({ 
-            solicitante: solicitante || "Anônimo (Chatbot)", 
+            solicitante: solicitante || "Usuário Web", 
+            matricula: "CHATBOT",
             setor: "Autoatendimento", 
             problema: problema,
-            status: 'auto_solucionado', // Status especial
-            solucao: 'Resolvido pelo usuário via Chatbot (Nível 0)'
+            status: 'auto_solucionado', 
+            solucao: 'Resolvido pelo usuário via Chatbot'
         });
         
         console.log(`🤖 Autoatendimento registrado: ${problema}`);
@@ -131,10 +95,20 @@ app.post('/api/ticket/auto', async (req, res) => {
     }
 });
 
+// ROTA 5: ESTATÍSTICAS GESTOR (Com filtro de Hoje corrigido)
 app.get('/api/stats/hoje', async (req, res) => {
     try {
-        // Ordena por data (mais recentes primeiro)
-        const tickets = await Ticket.findAll({ order: [['timestamp', 'DESC']] });
+        // Define o início do dia de hoje (00:00:00) para filtrar
+        const inicioDia = new Date();
+        inicioDia.setHours(0,0,0,0);
+
+        // Busca tickets de hoje em diante
+        const tickets = await Ticket.findAll({
+            where: { 
+                timestamp: { [Op.gte]: inicioDia } 
+            },
+            order: [['timestamp', 'DESC']]
+        });
         
         // Listas Filtradas
         const listTotal = tickets;
@@ -142,7 +116,7 @@ app.get('/api/stats/hoje', async (req, res) => {
         const listRobo = tickets.filter(t => t.status === 'auto_solucionado');
         const listN3 = tickets.filter(t => t.status === 'n3');
 
-        // Agrupamento para o gráfico (Mantido igual)
+        // Agrupamento para o gráfico
         const categorias = {};
         tickets.forEach(t => {
             let cat = t.setor === 'Autoatendimento' ? 'Robô (Auto)' : t.problema.split(']')[0].replace('[','').trim();
@@ -151,13 +125,13 @@ app.get('/api/stats/hoje', async (req, res) => {
         });
 
         res.json({
-            // Contadores (KPIs)
+            // Contadores
             total: listTotal.length,
             resolvidos_humanos: listHumanos.length,
             resolvidos_robo: listRobo.length,
             escalados_n3: listN3.length,
             
-            // Listas para o Modal (NOVO!)
+            // Detalhes para o Modal
             detalhes: {
                 total: listTotal,
                 humanos: listHumanos,
@@ -169,7 +143,36 @@ app.get('/api/stats/hoje', async (req, res) => {
             grafico: categorias
         });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Erro ao gerar estatisticas' });
+    }
+});
+
+// --- 4. Rotina de Reset Diário (07:00 AM) ---
+cron.schedule('0 7 * * *', async () => {
+    console.log('⏰ Executando rotina de limpeza das 07h...');
+    const hoje = new Date().toISOString().split('T')[0];
+    const tickets = await Ticket.findAll();
+    
+    if (tickets.length > 0) {
+        if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
+        const csvWriter = createObjectCsvWriter({
+            path: `./logs/relatorio_${hoje}.csv`,
+            header: [
+                {id: 'id', title: 'ID'},
+                {id: 'solicitante', title: 'SOLICITANTE'},
+                {id: 'matricula', title: 'MATRICULA'},
+                {id: 'problema', title: 'PROBLEMA'},
+                {id: 'status', title: 'STATUS'},
+                {id: 'solucao', title: 'SOLUCAO'},
+                {id: 'createdAt', title: 'DATA'}
+            ]
+        });
+        await csvWriter.writeRecords(tickets.map(t => t.dataValues));
+        
+        // Limpa a tabela
+        await Ticket.destroy({ where: {}, truncate: true });
+        io.emit('reset_diario');
     }
 });
 
