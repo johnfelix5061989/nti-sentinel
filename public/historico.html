@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Histórico Sentinel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #13293D; 
+            color: #E8F1F2; 
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; /* Garante que o footer vá para o final */
+        }
+        .card-filter { background: #1f3a52; border: 1px solid #247BA0; padding: 20px; border-radius: 10px; }
+        .table-custom { background: #1f3a52; color: #fff; }
+        .table-custom th { background: #006494; color: white; }
+        .metric-box { background: #006494; padding: 15px; border-radius: 8px; text-align: center; }
+
+        /* Estilo do Rodapé */
+        footer {
+            margin-top: auto; /* Empurra para o fundo da página */
+            text-align: center;
+            padding: 20px;
+            font-size: 0.85rem;
+            color: #E8F1F2;
+            opacity: 0.5;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📂 Histórico & Auditoria</h2>
+        <a href="gestor.html" class="btn btn-outline-light">⬅ Voltar ao Gestor</a>
+    </div>
+
+    <div class="card-filter mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label>Data Inicial</label>
+                <input type="date" id="dataInicio" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label>Data Final</label>
+                <input type="date" id="dataFim" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label>Status</label>
+                <select id="statusFilter" class="form-select">
+                    <option value="todos">Todos</option>
+                    <option value="solucionado">Resolvidos</option>
+                    <option value="n3">Escalados N3</option>
+                    <option value="auto_solucionado">Autoatendimento</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label>Buscar</label>
+                <input type="text" id="buscaText" class="form-control" placeholder="Nome, Matrícula...">
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" onclick="carregarHistorico()">🔍 Filtrar</button>
+            <button class="btn btn-success" onclick="exportarCsv()">📥 Exportar CSV</button>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3"><div class="metric-box"><h5>Total</h5><h3 id="m-total">0</h3></div></div>
+        <div class="col-md-3"><div class="metric-box"><h5>Resolvidos</h5><h3 id="m-resolvidos">0</h3></div></div>
+        <div class="col-md-3"><div class="metric-box"><h5>N3 (Infra)</h5><h3 id="m-n3">0</h3></div></div>
+        <div class="col-md-3"><div class="metric-box"><h5>Tempo Médio</h5><h3 id="m-tempo">-</h3></div></div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-custom table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Data/Hora</th>
+                    <th>Solicitante</th>
+                    <th>Problema</th>
+                    <th>Prioridade</th>
+                    <th>Status</th>
+                    <th>Analista</th>
+                    <th>Tempo</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaHistorico">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<footer>
+    <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+</footer>
+
+<script>
+    // Define datas padrão (últimos 7 dias)
+    window.onload = () => {
+        const hoje = new Date().toISOString().split('T')[0];
+        const semanaPassada = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        document.getElementById('dataFim').value = hoje;
+        document.getElementById('dataInicio').value = semanaPassada;
+        carregarHistorico();
+    }
+
+    async function carregarHistorico() {
+        const inicio = document.getElementById('dataInicio').value;
+        const fim = document.getElementById('dataFim').value;
+        const status = document.getElementById('statusFilter').value;
+        const busca = document.getElementById('buscaText').value;
+
+        const res = await fetch(`/api/historico?inicio=${inicio}&fim=${fim}&status=${status}&busca=${busca}`);
+        const dados = await res.json();
+        
+        atualizarTabela(dados);
+        atualizarMetricas(dados);
+    }
+
+    function atualizarTabela(dados) {
+        const tbody = document.getElementById('tabelaHistorico');
+        tbody.innerHTML = '';
+        dados.forEach(t => {
+            const dataFmt = new Date(t.timestamp).toLocaleString('pt-BR');
+            const row = `
+                <tr>
+                    <td>#${t.id}</td>
+                    <td>${dataFmt}</td>
+                    <td>${t.solicitante} <small>(${t.matricula || '-'})</small></td>
+                    <td>${t.problema}</td>
+                    <td><span class="badge ${t.prioridade === 'Alta' ? 'bg-danger' : 'bg-secondary'}">${t.prioridade}</span></td>
+                    <td>${t.status}</td>
+                    <td>${t.analista || '-'}</td>
+                    <td>${t.tempo_resolucao || '-'}</td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function atualizarMetricas(dados) {
+        document.getElementById('m-total').innerText = dados.length;
+        document.getElementById('m-resolvidos').innerText = dados.filter(t => t.status.includes('solucionado')).length;
+        document.getElementById('m-n3').innerText = dados.filter(t => t.status === 'n3').length;
+        // Cálculo simples de tempo médio poderia ser implementado aqui
+    }
+
+    function exportarCsv() {
+        const inicio = document.getElementById('dataInicio').value;
+        const fim = document.getElementById('dataFim').value;
+        window.location.href = `/api/exportar?inicio=${inicio}&fim=${fim}`;
+    }
+</script>
+</body>
+</html>

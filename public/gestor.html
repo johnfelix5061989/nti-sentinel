@@ -28,14 +28,13 @@
             display: flex; 
             flex-direction: column; 
             min-height: 100vh;
-            filter: blur(15px); /* Começa borrado */
-            pointer-events: none; /* Bloqueia cliques */
+            filter: blur(15px);
+            pointer-events: none;
             transition: filter 0.5s ease;
         }
         
         .header { padding: 15px 30px; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; }
         
-        /* Cards */
         .card-stat {
             background: var(--bg-card);
             border-radius: 12px;
@@ -104,7 +103,6 @@
             border-top: 1px solid rgba(255,255,255,0.05);
         }
 
-        /* Input Group para Senha */
         .input-group-text { background: var(--accent); border: none; color: white; cursor: pointer; }
     </style>
 </head>
@@ -135,8 +133,9 @@
 
     <div class="header">
         <div>
-            <h2 class="m-0" style="color: white; font-weight: bold;">📊 NTI MANAGEMENT</h2>
-            <span style="color: var(--highlight); font-weight: 500;">Indicadores de Performance Diária</span>
+            <h2 class="m-0 d-inline-block align-middle" style="color: white; font-weight: bold;">📊 NTI MANAGEMENT</h2>
+            <a href="historico.html" class="btn btn-outline-info btn-sm ms-3">📜 Histórico Completo</a>
+            <button onclick="logout()" class="btn btn-outline-danger btn-sm ms-2">🚪 Sair</button>
         </div>
         <div class="clock-container">
             <div id="relogio-hora" class="clock-time">00:00:00</div>
@@ -220,7 +219,7 @@
     </div>
 
     <footer>
-        Desenvolvido por João Douglas Brito de Sá <strong>Félix</strong> 2026
+        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
     </footer>
 </div>
 
@@ -228,7 +227,7 @@
 <script>
     let dadosCache = {};
 
-    // --- LOGIN ---
+    // --- SEGURANÇA ---
     const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
     const inputSenha = document.getElementById('senhaInput');
 
@@ -252,17 +251,19 @@
             inputSenha.value = '';
         }
     }
-    
-    // Enter para logar
     inputSenha.addEventListener('keypress', (e) => { if(e.key==='Enter') verificarSenha(); });
 
     function desbloquearTela() {
         const app = document.getElementById('app-content');
         app.style.filter = 'none';
         app.style.pointerEvents = 'all';
-        // Inicia atualização dos dados
         updateDashboard();
         setInterval(updateDashboard, 5000);
+    }
+
+    function logout() {
+        sessionStorage.removeItem('gestor_logado');
+        window.location.href = 'home.html';
     }
 
     // --- SISTEMA ---

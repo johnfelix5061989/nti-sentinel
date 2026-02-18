@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal NTI Sentinel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0f202e;
+            --bg-card: #1f3a52;
+            --accent: #1B98E0;
+            --text: #E8F1F2;
+            --hover: #247BA0;
+        }
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            overflow: hidden;
+        }
+        .portal-container { text-align: center; animation: fadeIn 1s ease-in; }
+        .logo-area h1 { font-size: 3rem; font-weight: 800; letter-spacing: 3px; color: white; text-shadow: 0 0 20px rgba(27, 152, 224, 0.5); margin-bottom: 0.5rem; }
+        .logo-area p { color: var(--accent); font-weight: 500; margin-bottom: 3rem; text-transform: uppercase; letter-spacing: 2px; }
+        .card-portal {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            width: 280px;
+            height: 320px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+        }
+        .card-portal:hover { transform: translateY(-10px); background: var(--hover); box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-color: var(--accent); color: white; }
+        .icon-portal { font-size: 4rem; margin-bottom: 20px; }
+        .title-portal { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+        .desc-portal { font-size: 0.9rem; opacity: 0.7; }
+        .security-badge { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        footer { position: absolute; bottom: 20px; width: 100%; text-align: center; font-size: 0.8rem; opacity: 0.4; }
+    </style>
+</head>
+<body>
+
+    <div class="container portal-container">
+        <div class="logo-area">
+            <h1>NTI SENTINEL</h1>
+            <p>Sistema Integrado de Gestão</p>
+        </div>
+
+        <div class="row justify-content-center g-4">
+            <div class="col-auto">
+                <a href="index.html" class="card-portal">
+                    <div class="icon-portal">📱</div>
+                    <div class="title-portal">Usuário</div>
+                    <div class="desc-portal">Autoatendimento e Abertura de Chamados</div>
+                </a>
+            </div>
+
+            <div class="col-auto">
+                <a href="dashboard.html" class="card-portal">
+                    <span class="security-badge">🔒 Senha</span>
+                    <div class="icon-portal">📡</div>
+                    <div class="title-portal">Técnico NTI</div>
+                    <div class="desc-portal">Dashboard em Tempo Real e Resolução</div>
+                </a>
+            </div>
+
+            <div class="col-auto">
+                <a href="gestor.html" class="card-portal">
+                    <span class="security-badge">🔒 Senha</span>
+                    <div class="icon-portal">📊</div>
+                    <div class="title-portal">Gestor</div>
+                    <div class="desc-portal">Relatórios, KPIs e Histórico Completo</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+    </footer>
+
+    <script>
+        window.onload = function() {
+            // Se o usuário voltou para cá, removemos as credenciais
+            sessionStorage.removeItem('gestor_logado');
+            sessionStorage.removeItem('operador_logado');
+            console.log("🔒 Sessões de segurança encerradas.");
+        };
+    </script>
+
+</body>
+</html>
