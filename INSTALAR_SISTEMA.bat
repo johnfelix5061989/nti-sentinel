@@ -42,11 +42,11 @@ echo [OK] Permissoes ajustadas.
 :: 3. INSTALAR BIBLIOTECAS
 echo.
 echo [*] Instalando bibliotecas (Aguarde)...
-call npm install express socket.io sqlite3 sequelize cors node-cron csv-writer >nul 2>&1
+call npm install express socket.io sqlite3 sequelize cors node-cron csv-writer passport passport-local bcrypt express-session >nul 2>&1
 
 if %errorlevel% neq 0 (
     echo [AVISO] Ocorreu um erro na instalacao automatica. Tentando manual...
-    call npm install express socket.io sqlite3 sequelize cors node-cron csv-writer
+    call npm install express socket.io sqlite3 sequelize cors node-cron csv-writer passport passport-local bcrypt express-session
 )
 
 echo [OK] Bibliotecas verificadas!

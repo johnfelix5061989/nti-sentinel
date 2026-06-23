@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Dev - NTI Sentinel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #13293D;
+            --bg-card: #1f3a52;
+            --accent: #1B98E0;
+            --text: #E8F1F2;
+            --highlight: #00d2d3;
+            --danger: #ff6b6b;
+            --warning: #fdcb6e;
+        }
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
+        #app-content { filter: blur(15px); pointer-events: none; transition: filter 0.5s ease; }
+        .header { padding: 15px 30px; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .panel { max-width: 1100px; margin: 30px auto; }
+        .card-section { background: var(--bg-card); border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); border: 1px solid rgba(23, 240, 16, 0.05); }
+        .badge-pending { background: var(--warning); color: #000; }
+        .badge-dev { background: var(--highlight); color: #000000; }
+        .badge-gestor { background: var(--accent); color: #fff; }
+        .form-control, .form-select { background: rgba(0,0,0,0.3); border: 1px solid var(--accent); color: #ffffff; }
+        .form-control:focus, .form-select:focus { background: rgba(0,0,0,0.5); color: #ffffff; border-color: var(--highlight); box-shadow: none; }
+        .form-control::placeholder, .form-select::placeholder { color: #b8c6d6; opacity: 1; }
+        .table { color: var(--text); }
+        .table thead th { background: var(--accent); color: #ffffff; border-color: rgba(255,255,255,0.15); font-weight: 600; }
+        .table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05); }
+        .modal-content { background: var(--bg-deep); color: var(--text); border: 1px solid var(--accent); }
+        .modal-header { border-bottom: 1px solid var(--bg-card); }
+        .btn-close-white { filter: invert(1); }
+        .input-group-text { background: var(--accent); border: none; color: white; cursor: pointer; }
+        .pending-pulse { animation: pulse 1.8s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(253,203,110,0.5); } 70% { box-shadow: 0 0 0 12px rgba(253,203,110,0); } 100% { box-shadow: 0 0 0 0 rgba(253,203,110,0); } }
+        footer { text-align: center; padding: 15px; font-size: 0.8rem; opacity: 0.4; border-top: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+
+<!-- Modal Login -->
+<div class="modal fade" id="modalLogin" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border: 1px solid var(--highlight);">
+            <div class="modal-header border-0 justify-content-center">
+                <h3 style="color: white;">🛠️ Painel de Gestão</h3>
+            </div>
+            <div class="modal-body text-center">
+                <p class="text-light opacity-75">Acesso ao Dev ou Operador</p>
+                <input type="text" id="userInput" class="form-control text-center mb-2" placeholder="Usuário..." autocomplete="username">
+                <div class="input-group mb-3">
+                    <input type="password" id="senhaInput" class="form-control text-center" placeholder="Senha..." autocomplete="current-password">
+                    <span class="input-group-text" onclick="toggleSenha()">👁️</span>
+                </div>
+                <p id="erroSenha" class="text-danger fw-bold" style="display: none;"></p>
+                <button class="btn btn-primary w-100 py-2" onclick="verificarSenha()" style="background: var(--highlight); color:#000; font-weight:bold; border:none;">ACESSAR</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Trocar Senha -->
+<div class="modal fade" id="modalSenha" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔑 Alterar Minha Senha</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="password" id="senhaAtual" class="form-control mb-2" placeholder="Senha atual...">
+                <input type="password" id="novaSenha" class="form-control mb-2" placeholder="Nova senha...">
+                <input type="password" id="novaSenha2" class="form-control mb-2" placeholder="Confirmar nova senha...">
+                <p id="erroTroca" class="text-danger fw-bold" style="display:none;"></p>
+                <button class="btn btn-primary w-100 py-2" style="background: var(--highlight); color:#000; font-weight:bold; border:none;" onclick="trocarSenha()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reset Senha (Dev redefinindo senha de outro usuário) -->
+<div class="modal fade" id="modalReset" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔐 Redefinir Senha</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Redefinir senha de: <strong id="resetNome" style="color: var(--highlight);"></strong></p>
+                <input type="hidden" id="resetId">
+                <input type="password" id="resetNova" class="form-control mb-2" placeholder="Nova senha para o usuário...">
+                <p id="erroReset" class="text-danger fw-bold" style="display:none;"></p>
+                <button class="btn btn-primary w-100 py-2" style="background: var(--highlight); color:#000; font-weight:bold; border:none;" onclick="confirmarReset()">Redefinir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="app-content">
+    <div class="header">
+        <div>
+            <h2 class="m-0 d-inline-block align-middle" style="color: white; font-weight: bold;" id="tituloPainel">🛠️ NTI ADMIN</h2>
+            <span id="badgeUsuario" class="badge ms-2 badge-dev"></span>
+            <a href="dashboard.html" class="btn btn-outline-info btn-sm ms-2">📡 Operador</a>
+            <a href="gestor.html" class="btn btn-outline-info btn-sm ms-1">📊 Gestor</a>
+            <button onclick="abrirTrocarSenha()" class="btn btn-outline-warning btn-sm ms-1">🔑 Senha</button>
+            <button onclick="logout()" class="btn btn-outline-danger btn-sm ms-1">🚪 Sair</button>
+        </div>
+        <div>
+            <span id="badgePendencias" class="badge rounded-pill bg-warning text-dark pending-pulse hidden">0 pendentes</span>
+        </div>
+    </div>
+
+    <div class="panel">
+
+        <!-- Cadastros Pendentes -->
+        <div class="card-section">
+            <h5 class="mb-3">⏳ Cadastros Pendentes <span id="contaPend" class="badge bg-warning text-dark"></span></h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th><th>Usuário</th><th>Função</th><th>Solicitado em</th><th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaPendentes"></tbody>
+                </table>
+            </div>
+            <p id="semPend" class="text-muted text-center m-0">Nenhum cadastro pendente. 🎉</p>
+        </div>
+
+        <!-- Criar usuário-chave -->
+        <div class="card-section">
+            <h5 class="mb-3">➕ Criar Usuário-Chave (já aprovado)</h5>
+            <div class="row g-3">
+                <div class="col-md-3"><input type="text" id="novoNome" class="form-control" placeholder="Nome completo"></div>
+                <div class="col-md-3"><input type="text" id="novoUser" class="form-control" placeholder="Usuário (login)"></div>
+                <div class="col-md-3"><input type="password" id="novoSenha" class="form-control" placeholder="Senha"></div>
+                <div class="col-md-2">
+                    <select id="novoRole" class="form-select">
+                        <option value="gestor">Gestor</option>
+                        <option value="operador">Operador</option>
+                        <option value="dev" id="optDev">Dev</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-grid"><button class="btn btn-primary" style="background: var(--highlight); color:#000; border:none; font-weight:bold;" onclick="criarUsuario()">OK</button></div>
+            </div>
+            <p id="erroCriar" class="text-danger fw-bold mt-2" style="display:none;"></p>
+        </div>
+
+        <!-- Todos os usuários -->
+        <div class="card-section">
+            <h5 class="mb-3">👥 Usuários do Sistema</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th><th>Usuário</th><th>Função</th><th>Status</th><th>Criado em</th><th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaUsers"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    <footer>
+        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+    </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const inputUser = document.getElementById('userInput');
+    const inputSenha = document.getElementById('senhaInput');
+    const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
+    let usuarioAtual = null;
+
+    // --- Login (dev ou operador) ---
+    (async function init() {
+        try {
+            const res = await fetch('/auth/me');
+            const data = await res.json();
+            if (data.authenticated) {
+                usuarioAtual = data.user;
+                if (usuarioAtual.role !== 'dev' && usuarioAtual.role !== 'operador') {
+                    bloquearSemPermissao();
+                } else {
+                    desbloquearTela();
+                }
+            } else {
+                modalLogin.show();
+            }
+        } catch (e) { modalLogin.show(); }
+    })();
+
+    function toggleSenha() { inputSenha.type = inputSenha.type === 'password' ? 'text' : 'password'; }
+
+    async function verificarSenha() {
+        const username = inputUser.value.trim();
+        const senha = inputSenha.value;
+        if (!username || !senha) { mostrarErro('Preencha usuário e senha.'); return; }
+        try {
+            const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, senha })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                if (data.user.role !== 'dev' && data.user.role !== 'operador') {
+                    mostrarErro('Este usuário não tem permissão de gestão.');
+                    await fetch('/auth/logout', { method: 'POST' });
+                    return;
+                }
+                usuarioAtual = data.user;
+                modalLogin.hide();
+                desbloquearTela();
+            } else {
+                mostrarErro(data.error || 'Credenciais inválidas.');
+            }
+        } catch (e) { mostrarErro('Erro de conexão.'); }
+    }
+
+    function mostrarErro(msg) {
+        const el = document.getElementById('erroSenha');
+        el.textContent = msg; el.style.display = 'block'; inputSenha.value = '';
+    }
+
+    function bloquearSemPermissao() {
+        document.getElementById('app-content').innerHTML =
+            '<div class="text-center mt-5"><h3 style="color: var(--danger)">⛔ Acesso Negado</h3>' +
+            '<p>Esta área é restrita a Dev e Operador.</p>' +
+            '<a href="home.html" class="btn btn-outline-light">Voltar</a></div>';
+        document.getElementById('app-content').style.filter = 'none';
+        document.getElementById('app-content').style.pointerEvents = 'all';
+    }
+
+    inputSenha.addEventListener('keypress', (e) => { if (e.key === 'Enter') verificarSenha(); });
+    inputUser.addEventListener('keypress', (e) => { if (e.key === 'Enter') verificarSenha(); });
+
+    function desbloquearTela() {
+        const app = document.getElementById('app-content');
+        app.style.filter = 'none'; app.style.pointerEvents = 'all';
+        const ehDev = usuarioAtual.role === 'dev';
+        // Título e badge adaptativos
+        document.getElementById('tituloPainel').textContent = ehDev ? '🛠️ NTI ADMIN (Dev)' : '🛠️ NTI ADMIN (Operador)';
+        const badge = document.getElementById('badgeUsuario');
+        badge.textContent = `👤 ${usuarioAtual.nome} (${usuarioAtual.role})`;
+        badge.className = 'badge ms-2 ' + (ehDev ? 'badge-dev' : 'badge-gestor');
+        // Operador não pode criar Dev → esconde a opção
+        if (!ehDev) document.getElementById('optDev').style.display = 'none';
+        carregarUsuarios();
+    }
+
+    async function logout() {
+        await fetch('/auth/logout', { method: 'POST' });
+        window.location.href = 'home.html';
+    }
+
+    // --- Trocar própria senha ---
+    function abrirTrocarSenha() { new bootstrap.Modal(document.getElementById('modalSenha')).show(); }
+    async function trocarSenha() {
+        const atual = document.getElementById('senhaAtual').value;
+        const nova = document.getElementById('novaSenha').value;
+        const nova2 = document.getElementById('novaSenha2').value;
+        const erro = document.getElementById('erroTroca');
+        erro.style.display = 'none';
+        if (!atual || !nova) { erro.textContent = 'Preencha os campos.'; erro.style.display = 'block'; return; }
+        if (nova !== nova2) { erro.textContent = 'As senhas não conferem.'; erro.style.display = 'block'; return; }
+        if (nova.length < 4) { erro.textContent = 'Nova senha muito curta (mín 4).'; erro.style.display = 'block'; return; }
+        try {
+            const res = await fetch('/auth/password', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senhaAtual: atual, novaSenha: nova })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert('Senha alterada!'); bootstrap.Modal.getInstance(document.getElementById('modalSenha')).hide();
+                ['senhaAtual','novaSenha','novaSenha2'].forEach(id => document.getElementById(id).value = '');
+            } else { erro.textContent = data.error || 'Erro.'; erro.style.display = 'block'; }
+        } catch (e) { erro.textContent = 'Erro de conexão.'; erro.style.display = 'block'; }
+    }
+
+    // --- Carregar usuários ---
+    async function carregarUsuarios() {
+        try {
+            const res = await fetch('/auth/users');
+            if (!res.ok) return;
+            const users = await res.json();
+            const pendentes = users.filter(u => u.status === 'pendente');
+            const aprovados = users.filter(u => u.status === 'aprovado');
+
+            // Badge de pendências
+            const badge = document.getElementById('badgePendencias');
+            if (pendentes.length > 0) { badge.textContent = `${pendentes.length} pendentes`; badge.classList.remove('hidden'); }
+            else { badge.classList.add('hidden'); }
+            document.getElementById('contaPend').textContent = pendentes.length;
+
+            // Tabela pendentes
+            const tbPend = document.getElementById('tabelaPendentes');
+            const semPend = document.getElementById('semPend');
+            tbPend.innerHTML = '';
+            if (pendentes.length === 0) { semPend.style.display = 'block'; }
+            else {
+                semPend.style.display = 'none';
+                pendentes.forEach(u => {
+                    const dt = new Date(u.criadoEm).toLocaleString('pt-BR');
+                    tbPend.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td>${u.nome}</td><td><code>${u.username}</code></td>
+                            <td><span class="badge badge-gestor">${u.role}</span></td>
+                            <td><small>${dt}</small></td>
+                            <td class="text-end">
+                                <button class="btn btn-success btn-sm" onclick="aprovar(${u.id})">✅ Aprovar</button>
+                                <button class="btn btn-danger btn-sm" onclick="recusar(${u.id}, '${u.nome}')">❌ Recusar</button>
+                            </td>
+                        </tr>`);
+                });
+            }
+
+            // Tabela todos (aprovados)
+            const tbAll = document.getElementById('tabelaUsers');
+            tbAll.innerHTML = '';
+            aprovados.forEach(u => {
+                const ehAdmin = u.username === 'admin';
+                const dt = new Date(u.criadoEm).toLocaleString('pt-BR');
+                const roleBadge = u.role === 'dev' ? '<span class="badge badge-dev">Dev</span>' : '<span class="badge badge-gestor">Gestor</span>';
+                const acoes = ehAdmin
+                    ? '<span class="text-muted small">Protegido</span>'
+                    : `<button class="btn btn-outline-warning btn-sm" onclick="abrirReset(${u.id}, '${u.nome}')">🔐 Senha</button>
+                       <button class="btn btn-outline-danger btn-sm" onclick="remover(${u.id}, '${u.nome}')">🗑️ Remover</button>`;
+                tbAll.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>${u.nome}${ehAdmin ? ' <span class="badge bg-secondary ms-1">inicial</span>' : ''}</td>
+                        <td><code>${u.username}</code></td>
+                        <td>${roleBadge}</td>
+                        <td><span class="badge bg-success">aprovado</span></td>
+                        <td><small>${dt}</small></td>
+                        <td class="text-end">${acoes}</td>
+                    </tr>`);
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    async function aprovar(id) {
+        if (!confirm('Aprovar este cadastro?')) return;
+        await fetch(`/auth/approve/${id}`, { method: 'POST' });
+        carregarUsuarios();
+    }
+
+    async function recusar(id, nome) {
+        if (!confirm(`Recusar e remover o cadastro de "${nome}"?`)) return;
+        await fetch(`/auth/reject/${id}`, { method: 'POST' });
+        carregarUsuarios();
+    }
+
+    async function remover(id, nome) {
+        if (!confirm(`Remover definitivamente o usuário "${nome}"?`)) return;
+        const res = await fetch(`/auth/reject/${id}`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Erro ao remover.'); return; }
+        carregarUsuarios();
+    }
+
+    // --- Criar usuário ---
+    async function criarUsuario() {
+        const nome = document.getElementById('novoNome').value.trim();
+        const username = document.getElementById('novoUser').value.trim();
+        const senha = document.getElementById('novoSenha').value;
+        const role = document.getElementById('novoRole').value;
+        const erro = document.getElementById('erroCriar');
+        erro.style.display = 'none';
+        if (!nome || !username || !senha) { erro.textContent = 'Preencha todos os campos.'; erro.style.display = 'block'; return; }
+        if (senha.length < 4) { erro.textContent = 'Senha muito curta.'; erro.style.display = 'block'; return; }
+        try {
+            const res = await fetch('/auth/create', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, username, senha, role })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                ['novoNome','novoUser','novoSenha'].forEach(id => document.getElementById(id).value = '');
+                alert(`Usuário "${data.user.nome}" criado como ${data.user.role} (aprovado).`);
+                carregarUsuarios();
+            } else { erro.textContent = data.error || 'Erro.'; erro.style.display = 'block'; }
+        } catch (e) { erro.textContent = 'Erro de conexão.'; erro.style.display = 'block'; }
+    }
+
+    // --- Reset senha de outro usuário ---
+    function abrirReset(id, nome) {
+        document.getElementById('resetId').value = id;
+        document.getElementById('resetNome').textContent = nome;
+        document.getElementById('resetNova').value = '';
+        document.getElementById('erroReset').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('modalReset')).show();
+    }
+
+    async function confirmarReset() {
+        const id = document.getElementById('resetId').value;
+        const nova = document.getElementById('resetNova').value;
+        const erro = document.getElementById('erroReset');
+        erro.style.display = 'none';
+        if (!nova || nova.length < 4) { erro.textContent = 'Nova senha muito curta (mín 4).'; erro.style.display = 'block'; return; }
+        try {
+            const res = await fetch(`/auth/reset/${id}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ novaSenha: nova })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert('Senha redefinida!'); bootstrap.Modal.getInstance(document.getElementById('modalReset')).hide();
+                carregarUsuarios();
+            } else { erro.textContent = data.error || 'Erro.'; erro.style.display = 'block'; }
+        } catch (e) { erro.textContent = 'Erro de conexão.'; erro.style.display = 'block'; }
+    }
+</script>
+</body>
+</html>

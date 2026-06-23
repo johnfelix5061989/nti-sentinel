@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro de Gestor - NTI Sentinel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #13293D;
+            --bg-surface: #006494;
+            --accent-1: #247BA0;
+            --accent-bright: #1B98E0;
+            --text-light: #E8F1F2;
+        }
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-light);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .btn-home {
+            position: absolute; top: 15px; left: 15px;
+            text-decoration: none; color: var(--accent-bright);
+            border: 1px solid var(--accent-bright); padding: 8px 15px;
+            border-radius: 20px; font-weight: bold; font-size: 0.9rem;
+            transition: all 0.3s ease; z-index: 1000; background: rgba(19,41,61,0.8);
+        }
+        .btn-home:hover { background-color: var(--accent-bright); color: var(--bg-deep); }
+        .form-container {
+            max-width: 460px; margin: 70px auto 40px auto;
+            background: var(--bg-surface); padding: 30px;
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--accent-1);
+        }
+        .form-control { background-color: var(--bg-deep); border: 1px solid var(--accent-1); color: var(--text-light); }
+        .form-control:focus { background-color: var(--bg-deep); color: white; border-color: var(--accent-bright); box-shadow: none; }
+        .form-control::placeholder { color: #8faab9; }
+        .hidden { display: none; }
+        footer { margin-top: auto; text-align: center; padding: 20px; font-size: 0.85rem; opacity: 0.6; border-top: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body>
+
+    <a href="home.html" class="btn-home">🏠 Home</a>
+
+    <div class="container">
+        <div class="form-container">
+            <div class="text-center mb-4">
+                <h4 style="color: var(--accent-bright)" id="tituloForm">📝 Cadastro</h4>
+                <small class="text-light opacity-75">Sua conta será criada como <strong>pendente</strong>.<br>Um administrador precisa aprovar antes do primeiro acesso.</small>
+            </div>
+
+            <div id="formBox">
+                <div class="mb-3">
+                    <label class="form-label small">Nome completo</label>
+                    <input type="text" id="nome" class="form-control" placeholder="Ex.: João Douglas">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Usuário (login)</label>
+                    <input type="text" id="username" class="form-control" placeholder="Ex.: j.douglas" autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Senha</label>
+                    <input type="password" id="senha" class="form-control" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Confirmar senha</label>
+                    <input type="password" id="senha2" class="form-control" autocomplete="new-password">
+                </div>
+                <p id="erro" class="text-danger fw-bold" style="display:none;"></p>
+                <button class="btn btn-primary w-100 py-2" style="background: var(--accent-bright); border:none; font-weight:bold;" onclick="cadastrar()">🚀 Cadastrar</button>
+                <a href="home.html" class="d-block text-center mt-3 small" style="color: var(--accent-bright);">⬅ Voltar ao início</a>
+            </div>
+
+            <div id="sucessoBox" class="hidden text-center">
+                <div class="alert alert-success mt-3">
+                    ✅ <strong>Cadastro enviado!</strong><br>
+                    Aguarde a aprovação do Dev do NTI para acessar o painel.
+                </div>
+                <a href="home.html" class="btn btn-outline-light">Voltar ao início</a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <strong>Desenvolvido por</strong> João Douglas Brito de Sá <strong>Félix</strong> 2026
+    </footer>
+
+    <script>
+        // Define o role conforme a URL (?role=operador ou ?role=gestor)
+        const params = new URLSearchParams(window.location.search);
+        const role = params.get('role') === 'operador' ? 'operador' : 'gestor';
+        const ehOperador = role === 'operador';
+        document.getElementById('tituloForm').textContent = ehOperador ? '📝 Cadastro de Operador' : '📝 Cadastro de Gestor';
+        document.querySelector('a[href="home.html"]').textContent = ehOperador ? '⬅ Voltar ao login' : '⬅ Voltar ao login';
+        document.querySelector('a[href="home.html"]').href = ehOperador ? 'dashboard.html' : 'gestor.html';
+
+        async function cadastrar() {
+            const nome = document.getElementById('nome').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const senha = document.getElementById('senha').value;
+            const senha2 = document.getElementById('senha2').value;
+            const erro = document.getElementById('erro');
+            erro.style.display = 'none';
+
+            if (!nome || !username || !senha) { erro.textContent = 'Preencha todos os campos.'; erro.style.display = 'block'; return; }
+            if (senha !== senha2) { erro.textContent = 'As senhas não conferem.'; erro.style.display = 'block'; return; }
+            if (senha.length < 4) { erro.textContent = 'Senha muito curta (mínimo 4).'; erro.style.display = 'block'; return; }
+
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome, username, senha, role })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    document.getElementById('formBox').classList.add('hidden');
+                    document.getElementById('sucessoBox').classList.remove('hidden');
+                } else {
+                    erro.textContent = data.error || 'Erro ao cadastrar.';
+                    erro.style.display = 'block';
+                }
+            } catch (e) {
+                erro.textContent = 'Erro de conexão.';
+                erro.style.display = 'block';
+            }
+        }
+
+        document.getElementById('senha2').addEventListener('keypress', (e) => { if (e.key === 'Enter') cadastrar(); });
+    </script>
+</body>
+</html>

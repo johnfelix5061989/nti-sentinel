@@ -136,13 +136,34 @@
                 <h3 style="color: white;">🛡️ NTI Sentinel</h3>
             </div>
             <div class="modal-body text-center">
-                <p class="text-light opacity-75">Acesso Restrito ao Operador</p>
+                <p class="text-light opacity-75">Acesso ao Operador (Dev / Gestor)</p>
+                <input type="text" id="userInput" class="form-control text-center mb-2" placeholder="Usuário..." style="font-size: 1.1rem;" autocomplete="username">
                 <div class="input-group mb-3">
-                    <input type="password" id="senhaInput" class="form-control text-center" placeholder="Senha..." style="font-size: 1.2rem;">
+                    <input type="password" id="senhaInput" class="form-control text-center" placeholder="Senha..." style="font-size: 1.1rem;" autocomplete="current-password">
                     <span class="input-group-text" onclick="toggleSenha()">👁️</span>
                 </div>
-                <p id="erroSenha" class="text-danger fw-bold" style="display: none;">Senha incorreta!</p>
+                <p id="erroSenha" class="text-danger fw-bold" style="display: none;"></p>
                 <button class="btn btn-primary w-100 py-2" onclick="verificarSenha()" style="background: var(--accent-bright); font-weight: bold;">ACESSAR SISTEMA</button>
+                <a href="registrar.html?role=operador" class="d-block mt-3 small" style="color: var(--accent-bright);">📝 Primeiro acesso? Cadastre-se</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Trocar Senha -->
+<div class="modal fade" id="modalSenha" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔑 Alterar Minha Senha</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="password" id="senhaAtual" class="form-control mb-2" placeholder="Senha atual...">
+                <input type="password" id="novaSenha" class="form-control mb-2" placeholder="Nova senha...">
+                <input type="password" id="novaSenha2" class="form-control mb-2" placeholder="Confirmar nova senha...">
+                <p id="erroTroca" class="text-danger fw-bold" style="display:none;"></p>
+                <button class="btn btn-resolve w-100 py-2" onclick="trocarSenha()">Salvar nova senha</button>
             </div>
         </div>
     </div>
@@ -152,7 +173,9 @@
     <div class="header">
         <div>
             <h1 class="d-inline-block align-middle">📡 NTI SENTINEL</h1>
-            <button onclick="logout()" class="btn btn-outline-danger btn-sm ms-3" style="border: 1px solid #ff6b6b; color: #ff6b6b;">🚪 SAIR</button>
+            <span id="badgeUsuario" class="badge ms-2" style="background:var(--accent-1);"></span>
+            <button onclick="abrirTrocarSenha()" class="btn btn-outline-warning btn-sm ms-2">🔑 Senha</button>
+            <button onclick="logout()" class="btn btn-outline-danger btn-sm ms-1" style="border: 1px solid #ff6b6b; color: #ff6b6b;">🚪 SAIR</button>
         </div>
         <div class="text-end">
             <h2 id="relogio" style="font-family: monospace; color: var(--accent-bright);">00:00:00</h2>
@@ -223,45 +246,107 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    const inputUser = document.getElementById('userInput');
     const inputSenha = document.getElementById('senhaInput');
     const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
+    let usuarioAtual = null;
 
-    // --- 1. SEGURANÇA E LOGIN ---
-    if(!sessionStorage.getItem('operador_logado')) {
-        modalLogin.show();
-    } else {
-        desbloquearTela();
-    }
+    // --- 1. SEGURANÇA E LOGIN (Passport) ---
+    (async function init() {
+        try {
+            const res = await fetch('/auth/me');
+            const data = await res.json();
+            if (data.authenticated) {
+                usuarioAtual = data.user;
+                desbloquearTela();
+            } else {
+                modalLogin.show();
+            }
+        } catch (e) { modalLogin.show(); }
+    })();
 
     function toggleSenha() {
         inputSenha.type = inputSenha.type === 'password' ? 'text' : 'password';
     }
 
-    function verificarSenha() {
-        if(inputSenha.value === "nti2026") { 
-            sessionStorage.setItem('operador_logado', 'true');
-            modalLogin.hide();
-            desbloquearTela();
-        } else {
-            document.getElementById('erroSenha').style.display = 'block';
-            inputSenha.value = '';
-        }
+    async function verificarSenha() {
+        const username = inputUser.value.trim();
+        const senha = inputSenha.value;
+        if (!username || !senha) { mostrarErro('Preencha usuário e senha.'); return; }
+        try {
+            const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, senha })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                usuarioAtual = data.user;
+                modalLogin.hide();
+                desbloquearTela();
+            } else {
+                mostrarErro(data.error || 'Credenciais inválidas.');
+            }
+        } catch (e) { mostrarErro('Erro de conexão.'); }
     }
-    
-    inputSenha.addEventListener('keypress', (e) => { if(e.key==='Enter') verificarSenha(); });
+
+    function mostrarErro(msg) {
+        const el = document.getElementById('erroSenha');
+        el.textContent = msg;
+        el.style.display = 'block';
+        inputSenha.value = '';
+    }
+
+    inputSenha.addEventListener('keypress', (e) => { if (e.key === 'Enter') verificarSenha(); });
+    inputUser.addEventListener('keypress', (e) => { if (e.key === 'Enter') verificarSenha(); });
 
     function desbloquearTela() {
         const app = document.getElementById('app-content');
         app.style.filter = 'none';
         app.style.pointerEvents = 'all';
+        const badge = document.getElementById('badgeUsuario');
+        badge.textContent = `👤 ${usuarioAtual.nome} (${usuarioAtual.role})`;
         iniciarSistema();
     }
 
-    function logout() {
-        if(confirm("Deseja sair do painel?")) {
-            sessionStorage.removeItem('operador_logado');
+    async function logout() {
+        if (confirm("Deseja sair do painel?")) {
+            await fetch('/auth/logout', { method: 'POST' });
             window.location.href = 'home.html';
         }
+    }
+
+    // --- Trocar senha ---
+    function abrirTrocarSenha() {
+        new bootstrap.Modal(document.getElementById('modalSenha')).show();
+    }
+
+    async function trocarSenha() {
+        const atual = document.getElementById('senhaAtual').value;
+        const nova = document.getElementById('novaSenha').value;
+        const nova2 = document.getElementById('novaSenha2').value;
+        const erro = document.getElementById('erroTroca');
+        erro.style.display = 'none';
+        if (!atual || !nova) { erro.textContent = 'Preencha os campos.'; erro.style.display = 'block'; return; }
+        if (nova !== nova2) { erro.textContent = 'As senhas não conferem.'; erro.style.display = 'block'; return; }
+        if (nova.length < 4) { erro.textContent = 'Nova senha muito curta (mín 4).'; erro.style.display = 'block'; return; }
+        try {
+            const res = await fetch('/auth/password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ senhaAtual: atual, novaSenha: nova })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                alert('Senha alterada com sucesso!');
+                bootstrap.Modal.getInstance(document.getElementById('modalSenha')).hide();
+                document.getElementById('senhaAtual').value = '';
+                document.getElementById('novaSenha').value = '';
+                document.getElementById('novaSenha2').value = '';
+            } else {
+                erro.textContent = data.error || 'Erro ao alterar.'; erro.style.display = 'block';
+            }
+        } catch (e) { erro.textContent = 'Erro de conexão.'; erro.style.display = 'block'; }
     }
 
     // --- 2. SISTEMA SENTINEL ---
@@ -275,10 +360,10 @@
         setInterval(() => { document.getElementById('relogio').innerText = new Date().toLocaleTimeString('pt-BR'); }, 1000);
         
         // Busca Inicial de Chamados
-        fetch('/api/tickets/ativos').then(r => r.json()).then(tickets => {
+        fetch('/api/tickets/ativos').then(r => { if(!r.ok) throw 0; return r.json(); }).then(tickets => {
             if(tickets.length === 0) emptyState.style.display = 'block';
             tickets.forEach(adicionarCard);
-        });
+        }).catch(()=>{});
 
         // Busca Inicial de Métricas (NOVO)
         atualizarMetricas();
@@ -362,7 +447,7 @@
     async function resolver(res) {
         const id = document.getElementById('ticketId').value; 
         const sol = document.getElementById('solucaoTexto').value;
-        const analista = "Operador NTI"; 
+        const analista = usuarioAtual ? usuarioAtual.nome : "Operador NTI"; 
 
         if(!sol) return alert("Descreva a solução.");
         
