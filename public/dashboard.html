@@ -230,6 +230,10 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="ticketId">
+
+                <!-- Dados do solicitante -->
+                <div id="dados-solicitante" class="mb-3" style="background: rgba(0,0,0,0.25); border-radius: 10px; padding: 15px; border-left: 4px solid var(--accent-bright);"></div>
+
                 <div class="mb-3">
                     <label class="text-info mb-2">Solução / Parecer Técnico:</label>
                     <textarea id="solucaoTexto" class="form-control" rows="4" placeholder="Descreva o procedimento realizado..."></textarea>
@@ -246,6 +250,13 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // --- Escape HTML (proteção XSS) ---
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     const inputUser = document.getElementById('userInput');
     const inputSenha = document.getElementById('senhaInput');
     const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
@@ -354,6 +365,25 @@
     const lista = document.getElementById('lista-chamados');
     const emptyState = document.getElementById('empty-state');
     let modalInstance;
+    const ticketsCache = {}; // id -> ticket (para o modal acessar dados)
+
+    // Reconexão Socket.IO
+    socket.on('connect', () => console.log('🔌 WebSocket conectado.'));
+    socket.on('disconnect', () => console.warn('⚠️ WebSocket desconectado.'));
+    socket.on('connect_error', () => console.warn('⚠️ Erro de conexão WebSocket.'));
+
+    // Detecta se o texto parece um telefone e monta link wa.me
+    function linkWhatsApp(ramal) {
+        if (!ramal) return null;
+        // Remove tudo que não for dígito
+        const apenasDigitos = ramal.replace(/\D/g, '');
+        // Ramal interno costuma ter <= 5 dígitos -> não é WhatsApp
+        // Telefone/WhatsApp costuma ter 8-13 dígitos (com DDD/DDI)
+        if (apenasDigitos.length < 8) return null;
+        // Se não tiver DDI (55), assume Brasil
+        const numero = apenasDigitos.length <= 11 ? '55' + apenasDigitos : apenasDigitos;
+        return `https://wa.me/${numero}`;
+    }
 
     function iniciarSistema() {
         // Relógio
@@ -411,24 +441,37 @@
     }
 
     function adicionarCard(t) {
-        const matTexto = t.matricula ? `(Mat: ${t.matricula})` : '';
+        ticketsCache[t.id] = t;
+        const matTexto = t.matricula ? `(Mat: ${esc(t.matricula)})` : '';
         const prioridadeHtml = t.prioridade === 'Alta' ? '<span class="badge bg-danger ms-1">🔥 Alta</span>' : '';
+        
+        // Telefone/Ramal com link WhatsApp se for telefone
+        let ramalHtml = '';
+        if (t.ramal) {
+            const wpp = linkWhatsApp(t.ramal);
+            if (wpp) {
+                ramalHtml = `<a href="${esc(wpp)}" target="_blank" rel="noopener" style="color:#25D366; text-decoration:none; font-weight:bold;" onclick="event.stopPropagation()">📱 ${esc(t.ramal)} 💬</a>`;
+            } else {
+                ramalHtml = `📍 ${esc(t.ramal)}`;
+            }
+        }
         
         const html = `
             <div class="col-md-4 col-lg-3 fade-in" id="card-${t.id}">
                 <div class="card card-ticket p-3 new-ticket" onclick="abrirModal(${t.id})">
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="badge" style="background:var(--bg-deep); color:var(--text-light)">#${t.id}</span>
+                        <span class="badge" style="background:var(--bg-deep); color:var(--text-light)">#${esc(t.id)}</span>
                         <div>
-                            <span class="badge badge-setor">${t.setor}</span>
+                            <span class="badge badge-setor">${esc(t.setor)}</span>
                             ${prioridadeHtml}
                         </div>
                     </div>
-                    <h4>${t.problema}</h4>
+                    <h4>${esc(t.problema)}</h4>
                     <hr style="border-color:var(--accent-1);opacity:0.3">
                     <div class="ticket-meta">
-                        👤 ${t.solicitante} <br> 
-                        <small class="text-info">${matTexto}</small> <br> 
+                        👤 ${esc(t.solicitante)} <br> 
+                        <small class="text-info">${matTexto}</small> <br>
+                        ${ramalHtml} <br>
                         🕒 ${new Date(t.timestamp).toLocaleTimeString('pt-BR')}
                     </div>
                 </div>
@@ -438,10 +481,41 @@
         setTimeout(() => { try{document.getElementById(`card-${t.id}`).querySelector('.card-ticket').classList.remove('new-ticket')}catch(e){} }, 15000);
     }
 
-    function abrirModal(id) { 
-        document.getElementById('ticketId').value = id; 
-        modalInstance = new bootstrap.Modal(document.getElementById('modalResolucao')); 
-        modalInstance.show(); 
+    function abrirModal(id) {
+        document.getElementById('ticketId').value = id;
+        // Popula dados do solicitante
+        const t = ticketsCache[id];
+        const div = document.getElementById('dados-solicitante');
+        if (t) {
+            const dataFmt = new Date(t.timestamp).toLocaleString('pt-BR');
+            const prioridade = t.prioridade === 'Alta' ? ' <span class="badge bg-danger">🔥 Alta</span>' : '';
+            let contatoHtml = '';
+            if (t.ramal) {
+                const wpp = linkWhatsApp(t.ramal);
+                if (wpp) {
+                    contatoHtml = `<div class="mt-2"><a href="${esc(wpp)}" target="_blank" rel="noopener" class="btn btn-success btn-sm" style="background:#25D366; border:none; font-weight:bold;">📱 ${esc(t.ramal)} — Abrir no WhatsApp 💬</a></div>`;
+                } else {
+                    contatoHtml = `<div class="mt-2"><span class="text-warning">📍 Ramal: ${esc(t.ramal)}</span></div>`;
+                }
+            }
+            div.innerHTML = `
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <div>
+                        <span class="badge" style="background:var(--bg-deep); color:var(--text-light)">#${esc(t.id)}</span>
+                        <span class="badge badge-setor ms-1">${esc(t.setor)}</span>
+                        ${prioridade}
+                    </div>
+                    <small class="opacity-75">🕒 ${esc(dataFmt)}</small>
+                </div>
+                <h5 class="mt-2 mb-1">👤 ${esc(t.solicitante)} ${t.matricula ? '<small class="text-info">(Mat: ' + esc(t.matricula) + ')</small>' : ''}</h5>
+                <p class="mb-1 text-warning"><strong>Problema:</strong> ${esc(t.problema)}</p>
+                ${contatoHtml}
+            `;
+        } else {
+            div.innerHTML = '<p class="text-muted">Dados do chamado não disponíveis.</p>';
+        }
+        modalInstance = new bootstrap.Modal(document.getElementById('modalResolucao'));
+        modalInstance.show();
     }
 
     async function resolver(res) {

@@ -250,6 +250,13 @@
 <script>
     let dadosCache = {};
 
+    // Escape HTML (proteção XSS)
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     // --- SEGURANÇA (Passport) ---
     const modalLogin = new bootstrap.Modal(document.getElementById('modalLogin'));
     const inputUser = document.getElementById('userInput');
@@ -397,7 +404,7 @@
                 if(t.status==='n3') badge='bg-danger';
                 if(t.status==='aberto') badge='bg-success';
                 const hora = new Date(t.timestamp).toLocaleTimeString('pt-BR');
-                const row = `<tr><td><code>${hora}</code></td><td>${t.solicitante}</td><td>${t.setor}</td><td>${t.problema}</td><td><span class="badge ${badge}">${t.status}</span></td><td><small>${t.solucao || '-'}</small></td></tr>`;
+                const row = `<tr><td><code>${esc(hora)}</code></td><td>${esc(t.solicitante)}</td><td>${esc(t.setor)}</td><td>${esc(t.problema)}</td><td><span class="badge ${badge}">${esc(t.status)}</span></td><td><small>${esc(t.solucao) || '-'}</small></td></tr>`;
                 tbody.insertAdjacentHTML('beforeend', row);
             });
         }

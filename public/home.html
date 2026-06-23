@@ -105,11 +105,10 @@
     </footer>
 
     <script>
-        window.onload = function() {
-            // Se o usuário voltou para cá, removemos as credenciais
-            sessionStorage.removeItem('gestor_logado');
-            sessionStorage.removeItem('operador_logado');
-            console.log("🔒 Sessões de segurança encerradas.");
+        window.onload = async function() {
+            // Encerra qualquer sessão ativa ao voltar para a home
+            try { await fetch('/auth/logout', { method: 'POST' }); } catch(e) {}
+            console.log("🔒 Sessão encerrada.");
         };
     </script>
 

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Histórico Sentinel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         body { 
             background-color: #13293D; 
@@ -66,7 +68,7 @@
         </div>
         <div class="mt-3 d-flex gap-2">
             <button class="btn btn-primary" onclick="carregarHistorico()">🔍 Filtrar</button>
-            <button class="btn btn-secondary" onclick="exportarCsvBanco()">📄 Exportar Esta Busca</button>
+            <button class="btn btn-secondary" onclick="exportarPDF()">📄 Exportar PDF</button>
         </div>
     </div>
 
@@ -78,35 +80,16 @@
                     <th>Data/Hora</th>
                     <th>Solicitante</th>
                     <th>Setor</th>
+                    <th>Ramal/Local</th>
                     <th>Problema</th>
                     <th>Status</th>
                     <th>Analista</th>
+                    <th>Solução / Parecer</th>
                 </tr>
             </thead>
             <tbody id="tabelaHistorico"></tbody>
         </table>
         <p class="text-muted text-center" id="msg-sem-dados" style="display:none">Nenhum registro encontrado no filtro atual.</p>
-    </div>
-
-    <hr style="border-color: #247BA0; opacity: 0.5;">
-
-    <h5 class="text-warning mb-3 mt-4">📂 Arquivos de Turno (Backups Fechados)</h5>
-    <p class="small text-muted">Estes arquivos contêm os chamados finalizados e removidos do banco diariamente às 07:00.</p>
-    
-    <div class="card-filter">
-        <div class="table-responsive">
-            <table class="table table-dark table-sm table-striped">
-                <thead>
-                    <tr>
-                        <th>Ano</th>
-                        <th>Arquivo de Log</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody id="tabelaLogs">
-                    </tbody>
-            </table>
-        </div>
     </div>
 </div>
 
@@ -115,15 +98,39 @@
 </footer>
 
 <script>
-    // Configura datas iniciais
-    window.onload = () => {
+    let dadosCache = []; // Guarda dados para exportação PDF
+
+    // Escape HTML (proteção XSS)
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Verifica autenticação antes de carregar
+    (async function() {
+        try {
+            const res = await fetch('/auth/me');
+            const data = await res.json();
+            if (!data.authenticated) {
+                alert('Você precisa estar logado. Redirecionando para o login...');
+                window.location.href = 'gestor.html';
+                return;
+            }
+            iniciar();
+        } catch (e) {
+            document.getElementById('tabelaHistorico').innerHTML =
+                '<tr><td colspan="9" class="text-danger text-center">Erro de conexão com o servidor.</td></tr>';
+        }
+    })();
+
+    function iniciar() {
         const hoje = new Date().toISOString().split('T')[0];
-        const semanaPassada = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const mesPassado = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         document.getElementById('dataFim').value = hoje;
-        document.getElementById('dataInicio').value = semanaPassada;
-        
-        carregarHistorico(); // Carrega tabela do banco
-        carregarLogs();      // Carrega lista de arquivos CSV
+        document.getElementById('dataInicio').value = mesPassado;
+
+        carregarHistorico();
     }
 
     // --- FUNÇÕES DE BUSCA (BANCO) ---
@@ -134,12 +141,18 @@
         const busca = document.getElementById('buscaText').value;
 
         try {
-            const res = await fetch(`/api/historico?inicio=${inicio}&fim=${fim}&status=${status}&busca=${busca}`);
+            const res = await fetch(`/api/historico?inicio=${inicio}&fim=${fim}&status=${status}&busca=${encodeURIComponent(busca)}`);
+            if (res.status === 403) {
+                document.getElementById('tabelaHistorico').innerHTML =
+                    '<tr><td colspan="9" class="text-danger text-center">Sessão expirada. <a href="gestor.html">Fazer login novamente</a>.</td></tr>';
+                return;
+            }
             const dados = await res.json();
-            
+            dadosCache = dados;
+
             const tbody = document.getElementById('tabelaHistorico');
             tbody.innerHTML = '';
-            
+
             if(dados.length === 0) {
                 document.getElementById('msg-sem-dados').style.display = 'block';
             } else {
@@ -147,15 +160,21 @@
                 dados.forEach(t => {
                     const dataFmt = new Date(t.timestamp).toLocaleString('pt-BR');
                     const badge = t.prioridade === 'Alta' ? '<span class="badge bg-danger">Alta</span>' : '';
+                    const statusBadge = t.status === 'solucionado' ? '<span class="badge bg-success">solucionado</span>'
+                        : t.status === 'n3' ? '<span class="badge bg-danger">n3</span>'
+                        : t.status === 'auto_solucionado' ? '<span class="badge bg-warning text-dark">auto</span>'
+                        : `<span class="badge bg-secondary">${esc(t.status)}</span>`;
                     const row = `
                         <tr>
-                            <td>#${t.id}</td>
-                            <td>${dataFmt}</td>
-                            <td>${t.solicitante} <br><small class="text-muted">${t.matricula || ''}</small></td>
-                            <td>${t.setor} ${badge}</td>
-                            <td>${t.problema}</td>
-                            <td>${t.status}</td>
-                            <td>${t.analista || '-'}</td>
+                            <td>#${esc(t.id)}</td>
+                            <td>${esc(dataFmt)}</td>
+                            <td>${esc(t.solicitante)} <br><small class="text-muted">${esc(t.matricula) || ''}</small></td>
+                            <td>${esc(t.setor)} ${badge}</td>
+                            <td>${esc(t.ramal) || '-'}</td>
+                            <td>${esc(t.problema)}</td>
+                            <td>${statusBadge}</td>
+                            <td>${esc(t.analista) || '-'}</td>
+                            <td><small>${esc(t.solucao) || '-'}</small></td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
@@ -164,40 +183,74 @@
         } catch(e) { console.error("Erro histórico", e); }
     }
 
-    function exportarCsvBanco() {
+    // --- EXPORTAÇÃO PDF ---
+    function exportarPDF() {
+        if (dadosCache.length === 0) {
+            alert('Nenhum registro para exportar. Faça uma busca primeiro.');
+            return;
+        }
+
         const inicio = document.getElementById('dataInicio').value;
         const fim = document.getElementById('dataFim').value;
-        window.location.href = `/api/exportar?inicio=${inicio}&fim=${fim}`;
-    }
+        const status = document.getElementById('statusFilter').value;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // landscape
 
-    // --- FUNÇÕES DE LOGS (CSV) ---
-    async function carregarLogs() {
-        try {
-            const res = await fetch('/api/logs-list');
-            const logs = await res.json();
-            const tbody = document.getElementById('tabelaLogs');
-            tbody.innerHTML = '';
+        // Cabeçalho
+        doc.setFillColor(19, 41, 61);
+        doc.rect(0, 0, 297, 28, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('NTI Sentinel - Relatório de Chamados', 14, 13);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Período: ${inicio} a ${fim}  |  Filtro: ${status}  |  Total: ${dadosCache.length} registros`, 14, 20);
+        doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}  |  Usuário: ${document.title}`, 14, 25);
 
-            if(logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center">Nenhum arquivo de log gerado ainda.</td></tr>';
-                return;
-            }
+        // Tabela
+        doc.autoTable({
+            startY: 34,
+            head: [['ID', 'Data/Hora', 'Solicitante', 'Setor', 'Ramal', 'Problema', 'Status', 'Analista', 'Solução']],
+            body: dadosCache.map(t => [
+                '#' + t.id,
+                new Date(t.timestamp).toLocaleString('pt-BR'),
+                t.solicitante + (t.matricula ? '\n(' + t.matricula + ')' : ''),
+                t.setor + (t.prioridade === 'Alta' ? ' [ALTA]' : ''),
+                t.ramal || '-',
+                t.problema,
+                t.status,
+                t.analista || '-',
+                t.solucao || '-'
+            ]),
+            styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
+            headStyles: { fillColor: [0, 100, 148], textColor: 255, fontSize: 8, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 245, 248] },
+            columnStyles: {
+                0: { cellWidth: 14 },
+                1: { cellWidth: 28 },
+                2: { cellWidth: 32 },
+                3: { cellWidth: 28 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 42 },
+                6: { cellWidth: 22 },
+                7: { cellWidth: 25 },
+                8: { cellWidth: 'auto' }
+            },
+            margin: { left: 10, right: 10 }
+        });
 
-            logs.forEach(l => {
-                const row = `
-                    <tr>
-                        <td>${l.ano}</td>
-                        <td>📄 ${l.arquivo}</td>
-                        <td>
-                            <a href="/api/logs/download/${l.ano}/${l.arquivo}" class="btn-download" target="_blank">
-                                📥 Baixar CSV
-                            </a>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-        } catch(e) { console.error("Erro logs", e); }
+        // Rodapé com numeração de páginas
+        const paginas = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= paginas; i++) {
+            doc.setPage(i);
+            doc.setFontSize(7);
+            doc.setTextColor(120, 120, 120);
+            doc.text(`Página ${i} de ${paginas}`, 287, 205, { align: 'right' });
+            doc.text('NTI Sentinel - CIODS', 10, 205);
+        }
+
+        doc.save(`Relatorio_NTISentinel_${inicio}_${fim}.pdf`);
     }
 </script>
 </body>
